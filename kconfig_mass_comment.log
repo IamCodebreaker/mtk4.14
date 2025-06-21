@@ -1,0 +1,5 @@
+[INFO] Mass-commenting security/Kconfig.hardening at Sat Jun 21 13:25:36 PKT 2025
+[*] Backing up original to security/Kconfig.hardening.bak
+[*] Commenting every line in security/Kconfig.hardening
+[✓] File commented successfully
+[✔] Done at Sat Jun 21 13:25:36 PKT 2025

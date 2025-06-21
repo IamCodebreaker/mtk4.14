@@ -3481,3 +3481,12 @@ patching file 'security/tomoyo/tomoyo.c'
 patching file 'security/tomoyo/util.c'
 patching file 'security/yama/yama_lsm.c'
 [✓] Applied: security_backport.patch
+[lineage-20 72d1c2a89] Applied patch: security_backport.patch
+ 122 files changed, 6191 insertions(+), 2559 deletions(-)
+ create mode 100644 security/apparmor/include/cred.h
+ create mode 100644 security/apparmor/include/net.h
+ create mode 100644 security/apparmor/include/task.h
+ create mode 100644 security/apparmor/net.c
+ create mode 100644 security/apparmor/stacksplitdfa.in
+ create mode 100644 security/apparmor/task.c
+[✔] Patch application completed at Sat Jun 21 12:53:45 PKT 2025

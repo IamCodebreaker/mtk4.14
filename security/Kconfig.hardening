@@ -1,156 +1,156 @@
-# SPDX-License-Identifier: GPL-2.0-only
-menu "Kernel hardening options"
-
-config GCC_PLUGIN_STRUCTLEAK
-	bool
-	help
-	  While the kernel is built with warnings enabled for any missed
-	  stack variable initializations, this warning is silenced for
-	  anything passed by reference to another function, under the
-	  occasionally misguided assumption that the function will do
-	  the initialization. As this regularly leads to exploitable
-	  flaws, this plugin is available to identify and zero-initialize
-	  such variables, depending on the chosen level of coverage.
-
-	  This plugin was originally ported from grsecurity/PaX. More
-	  information at:
-	   * https://grsecurity.net/
-	   * https://pax.grsecurity.net/
-
-menu "Memory initialization"
-
-config CC_HAS_AUTO_VAR_INIT_PATTERN
-	def_bool $(cc-option,-ftrivial-auto-var-init=pattern)
-
-config CC_HAS_AUTO_VAR_INIT_ZERO_BARE
-	def_bool $(cc-option,-ftrivial-auto-var-init=zero)
-
-config CC_HAS_AUTO_VAR_INIT_ZERO_ENABLER
-	# Clang 16 and later warn about using the -enable flag, but it
-	# is required before then.
-	def_bool $(cc-option,-ftrivial-auto-var-init=zero -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang)
-	depends on !CC_HAS_AUTO_VAR_INIT_ZERO_BARE
-
-config CC_HAS_AUTO_VAR_INIT_ZERO
-	def_bool CC_HAS_AUTO_VAR_INIT_ZERO_BARE || CC_HAS_AUTO_VAR_INIT_ZERO_ENABLER
-
-choice
-	prompt "Initialize kernel stack variables at function entry"
-	default GCC_PLUGIN_STRUCTLEAK_BYREF_ALL if COMPILE_TEST && GCC_PLUGINS
-	default INIT_STACK_ALL_PATTERN if COMPILE_TEST && CC_HAS_AUTO_VAR_INIT_PATTERN
-	default INIT_STACK_ALL_ZERO if CC_HAS_AUTO_VAR_INIT_ZERO
-	default INIT_STACK_NONE
-	help
-	  This option enables initialization of stack variables at
-	  function entry time. This has the possibility to have the
-	  greatest coverage (since all functions can have their
-	  variables initialized), but the performance impact depends
-	  on the function calling complexity of a given workload's
-	  syscalls.
-
-	  This chooses the level of coverage over classes of potentially
-	  uninitialized variables. The selected class of variable will be
-	  initialized before use in a function.
-
-	config INIT_STACK_NONE
-		bool "no automatic stack variable initialization (weakest)"
-		help
-		  Disable automatic stack variable initialization.
-		  This leaves the kernel vulnerable to the standard
-		  classes of uninitialized stack variable exploits
-		  and information exposures.
-
-	config GCC_PLUGIN_STRUCTLEAK_BYREF_ALL
-		bool "zero-init everything passed by reference (very strong)"
-		depends on GCC_PLUGINS
-		select GCC_PLUGIN_STRUCTLEAK
-		help
-		  Zero-initialize any stack variables that may be passed
-		  by reference and had not already been explicitly
-		  initialized. This is intended to eliminate all classes
-		  of uninitialized stack variable exploits and information
-		  exposures.
-
-		  As a side-effect, this keeps a lot of variables on the
-		  stack that can otherwise be optimized out, so combining
-		  this with CONFIG_KASAN_STACK can lead to a stack overflow
-		  and is disallowed.
-
-	config INIT_STACK_ALL_PATTERN
-		bool "pattern-init everything (strongest)"
-		depends on CC_HAS_AUTO_VAR_INIT_PATTERN
-		help
-		  Initializes everything on the stack (including padding)
-		  with a specific debug value. This is intended to eliminate
-		  all classes of uninitialized stack variable exploits and
-		  information exposures, even variables that were warned about
-		  having been left uninitialized.
-
-		  Pattern initialization is known to provoke many existing bugs
-		  related to uninitialized locals, e.g. pointers receive
-		  non-NULL values, buffer sizes and indices are very big. The
-		  pattern is situation-specific; Clang on 64-bit uses 0xAA
-		  repeating for all types and padding except float and double
-		  which use 0xFF repeating (-NaN). Clang on 32-bit uses 0xFF
-		  repeating for all types and padding.
-
-	config INIT_STACK_ALL_ZERO
-		bool "zero-init everything (strongest and safest)"
-		depends on CC_HAS_AUTO_VAR_INIT_ZERO
-		help
-		  Initializes everything on the stack (including padding)
-		  with a zero value. This is intended to eliminate all
-		  classes of uninitialized stack variable exploits and
-		  information exposures, even variables that were warned
-		  about having been left uninitialized.
-
-		  Zero initialization provides safe defaults for strings
-		  (immediately NUL-terminated), pointers (NULL), indices
-		  (index 0), and sizes (0 length), so it is therefore more
-		  suitable as a production security mitigation than pattern
-		  initialization.
-
-endchoice
-
-config GCC_PLUGIN_STRUCTLEAK_VERBOSE
-	bool "Report forcefully initialized variables"
-	depends on GCC_PLUGIN_STRUCTLEAK
-	depends on !COMPILE_TEST	# too noisy
-	help
-	  This option will cause a warning to be printed each time the
-	  structleak plugin finds a variable it thinks needs to be
-	  initialized. Since not all existing initializers are detected
-	  by the plugin, this can produce false positive warnings.
-
-config INIT_ON_ALLOC_DEFAULT_ON
-	bool "Enable heap memory zeroing on allocation by default"
-	help
-	  This has the effect of setting "init_on_alloc=1" on the kernel
-	  command line. This can be disabled with "init_on_alloc=0".
-	  When "init_on_alloc" is enabled, all page allocator and slab
-	  allocator memory will be zeroed when allocated, eliminating
-	  many kinds of "uninitialized heap memory" flaws, especially
-	  heap content exposures. The performance impact varies by
-	  workload, but most cases see <1% impact. Some synthetic
-	  workloads have measured as high as 7%.
-
-config INIT_ON_FREE_DEFAULT_ON
-	bool "Enable heap memory zeroing on free by default"
-	help
-	  This has the effect of setting "init_on_free=1" on the kernel
-	  command line. This can be disabled with "init_on_free=0".
-	  Similar to "init_on_alloc", when "init_on_free" is enabled,
-	  all page allocator and slab allocator memory will be zeroed
-	  when freed, eliminating many kinds of "uninitialized heap memory"
-	  flaws, especially heap content exposures. The primary difference
-	  with "init_on_free" is that data lifetime in memory is reduced,
-	  as anything freed is wiped immediately, making live forensics or
-	  cold boot memory attacks unable to recover freed memory contents.
-	  The performance impact varies by workload, but is more expensive
-	  than "init_on_alloc" due to the negative cache effects of
-	  touching "cold" memory areas. Most cases see 3-5% impact. Some
-	  synthetic workloads have measured as high as 8%.
-
-endmenu
-
-endmenu
+# [DISABLED] # SPDX-License-Identifier: GPL-2.0-only
+# [DISABLED] menu "Kernel hardening options"
+# [DISABLED] 
+# [DISABLED] config GCC_PLUGIN_STRUCTLEAK
+# [DISABLED] 	bool
+# [DISABLED] 	help
+# [DISABLED] 	  While the kernel is built with warnings enabled for any missed
+# [DISABLED] # [AUTO-COMMENTED] 	  stack variable initializations, this warning is silenced for
+# [DISABLED] # [AUTO-COMMENTED] 	  anything passed by reference to another function, under the
+# [DISABLED] 	  occasionally misguided assumption that the function will do
+# [DISABLED] 	  the initialization. As this regularly leads to exploitable
+# [DISABLED] # [AUTO-COMMENTED] 	  flaws, this plugin is available to identify and zero-initialize
+# [DISABLED] # [AUTO-COMMENTED] 	  such variables, depending on the chosen level of coverage.
+# [DISABLED] 
+# [DISABLED] 	  This plugin was originally ported from grsecurity/PaX. More
+# [DISABLED] 	  information at:
+# [DISABLED] 	   * https://grsecurity.net/
+# [DISABLED] 	   * https://pax.grsecurity.net/
+# [DISABLED] 
+# [DISABLED] menu "Memory initialization"
+# [DISABLED] 
+# [DISABLED] config CC_HAS_AUTO_VAR_INIT_PATTERN
+# [DISABLED] # [AUTO-COMMENTED] 	def_bool $(cc-option,-ftrivial-auto-var-init=pattern)
+# [DISABLED] 
+# [DISABLED] config CC_HAS_AUTO_VAR_INIT_ZERO_BARE
+# [DISABLED] # [AUTO-COMMENTED] 	def_bool $(cc-option,-ftrivial-auto-var-init=zero)
+# [DISABLED] 
+# [DISABLED] config CC_HAS_AUTO_VAR_INIT_ZERO_ENABLER
+# [DISABLED] # [AUTO-COMMENTED] 	# Clang 16 and later warn about using the -enable flag, but it
+# [DISABLED] 	# is required before then.
+# [DISABLED] # [AUTO-COMMENTED] 	def_bool $(cc-option,-ftrivial-auto-var-init=zero -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang)
+# [DISABLED] 	depends on !CC_HAS_AUTO_VAR_INIT_ZERO_BARE
+# [DISABLED] 
+# [DISABLED] config CC_HAS_AUTO_VAR_INIT_ZERO
+# [DISABLED] 	def_bool CC_HAS_AUTO_VAR_INIT_ZERO_BARE || CC_HAS_AUTO_VAR_INIT_ZERO_ENABLER
+# [DISABLED] 
+# [DISABLED] choice
+# [DISABLED] 	prompt "Initialize kernel stack variables at function entry"
+# [DISABLED] 	default GCC_PLUGIN_STRUCTLEAK_BYREF_ALL if COMPILE_TEST && GCC_PLUGINS
+# [DISABLED] 	default INIT_STACK_ALL_PATTERN if COMPILE_TEST && CC_HAS_AUTO_VAR_INIT_PATTERN
+# [DISABLED] 	default INIT_STACK_ALL_ZERO if CC_HAS_AUTO_VAR_INIT_ZERO
+# [DISABLED] 	default INIT_STACK_NONE
+# [DISABLED] 	help
+# [DISABLED] 	  This option enables initialization of stack variables at
+# [DISABLED] 	  function entry time. This has the possibility to have the
+# [DISABLED] 	  greatest coverage (since all functions can have their
+# [DISABLED] # [AUTO-COMMENTED] 	  variables initialized), but the performance impact depends
+# [DISABLED] 	  on the function calling complexity of a given workload's
+# [DISABLED] 	  syscalls.
+# [DISABLED] 
+# [DISABLED] 	  This chooses the level of coverage over classes of potentially
+# [DISABLED] 	  uninitialized variables. The selected class of variable will be
+# [DISABLED] 	  initialized before use in a function.
+# [DISABLED] 
+# [DISABLED] 	config INIT_STACK_NONE
+# [DISABLED] 		bool "no automatic stack variable initialization (weakest)"
+# [DISABLED] 		help
+# [DISABLED] 		  Disable automatic stack variable initialization.
+# [DISABLED] 		  This leaves the kernel vulnerable to the standard
+# [DISABLED] 		  classes of uninitialized stack variable exploits
+# [DISABLED] 		  and information exposures.
+# [DISABLED] 
+# [DISABLED] 	config GCC_PLUGIN_STRUCTLEAK_BYREF_ALL
+# [DISABLED] 		bool "zero-init everything passed by reference (very strong)"
+# [DISABLED] 		depends on GCC_PLUGINS
+# [DISABLED] 		select GCC_PLUGIN_STRUCTLEAK
+# [DISABLED] 		help
+# [DISABLED] 		  Zero-initialize any stack variables that may be passed
+# [DISABLED] 		  by reference and had not already been explicitly
+# [DISABLED] 		  initialized. This is intended to eliminate all classes
+# [DISABLED] 		  of uninitialized stack variable exploits and information
+# [DISABLED] 		  exposures.
+# [DISABLED] 
+# [DISABLED] # [AUTO-COMMENTED] 		  As a side-effect, this keeps a lot of variables on the
+# [DISABLED] # [AUTO-COMMENTED] 		  stack that can otherwise be optimized out, so combining
+# [DISABLED] 		  this with CONFIG_KASAN_STACK can lead to a stack overflow
+# [DISABLED] 		  and is disallowed.
+# [DISABLED] 
+# [DISABLED] 	config INIT_STACK_ALL_PATTERN
+# [DISABLED] 		bool "pattern-init everything (strongest)"
+# [DISABLED] 		depends on CC_HAS_AUTO_VAR_INIT_PATTERN
+# [DISABLED] 		help
+# [DISABLED] 		  Initializes everything on the stack (including padding)
+# [DISABLED] 		  with a specific debug value. This is intended to eliminate
+# [DISABLED] 		  all classes of uninitialized stack variable exploits and
+# [DISABLED] # [AUTO-COMMENTED] 		  information exposures, even variables that were warned about
+# [DISABLED] 		  having been left uninitialized.
+# [DISABLED] 
+# [DISABLED] 		  Pattern initialization is known to provoke many existing bugs
+# [DISABLED] # [AUTO-COMMENTED] 		  related to uninitialized locals, e.g. pointers receive
+# [DISABLED] # [AUTO-COMMENTED] 		  non-NULL values, buffer sizes and indices are very big. The
+# [DISABLED] 		  pattern is situation-specific; Clang on 64-bit uses 0xAA
+# [DISABLED] 		  repeating for all types and padding except float and double
+# [DISABLED] 		  which use 0xFF repeating (-NaN). Clang on 32-bit uses 0xFF
+# [DISABLED] 		  repeating for all types and padding.
+# [DISABLED] 
+# [DISABLED] 	config INIT_STACK_ALL_ZERO
+# [DISABLED] 		bool "zero-init everything (strongest and safest)"
+# [DISABLED] 		depends on CC_HAS_AUTO_VAR_INIT_ZERO
+# [DISABLED] 		help
+# [DISABLED] 		  Initializes everything on the stack (including padding)
+# [DISABLED] 		  with a zero value. This is intended to eliminate all
+# [DISABLED] 		  classes of uninitialized stack variable exploits and
+# [DISABLED] # [AUTO-COMMENTED] 		  information exposures, even variables that were warned
+# [DISABLED] 		  about having been left uninitialized.
+# [DISABLED] 
+# [DISABLED] 		  Zero initialization provides safe defaults for strings
+# [DISABLED] # [AUTO-COMMENTED] 		  (immediately NUL-terminated), pointers (NULL), indices
+# [DISABLED] # [AUTO-COMMENTED] 		  (index 0), and sizes (0 length), so it is therefore more
+# [DISABLED] 		  suitable as a production security mitigation than pattern
+# [DISABLED] 		  initialization.
+# [DISABLED] 
+# [DISABLED] endchoice
+# [DISABLED] 
+# [DISABLED] config GCC_PLUGIN_STRUCTLEAK_VERBOSE
+# [DISABLED] 	bool "Report forcefully initialized variables"
+# [DISABLED] 	depends on GCC_PLUGIN_STRUCTLEAK
+# [DISABLED] 	depends on !COMPILE_TEST	# too noisy
+# [DISABLED] 	help
+# [DISABLED] 	  This option will cause a warning to be printed each time the
+# [DISABLED] 	  structleak plugin finds a variable it thinks needs to be
+# [DISABLED] 	  initialized. Since not all existing initializers are detected
+# [DISABLED] # [AUTO-COMMENTED] 	  by the plugin, this can produce false positive warnings.
+# [DISABLED] 
+# [DISABLED] config INIT_ON_ALLOC_DEFAULT_ON
+# [DISABLED] 	bool "Enable heap memory zeroing on allocation by default"
+# [DISABLED] 	help
+# [DISABLED] 	  This has the effect of setting "init_on_alloc=1" on the kernel
+# [DISABLED] 	  command line. This can be disabled with "init_on_alloc=0".
+# [DISABLED] # [AUTO-COMMENTED] 	  When "init_on_alloc" is enabled, all page allocator and slab
+# [DISABLED] # [AUTO-COMMENTED] 	  allocator memory will be zeroed when allocated, eliminating
+# [DISABLED] # [AUTO-COMMENTED] 	  many kinds of "uninitialized heap memory" flaws, especially
+# [DISABLED] 	  heap content exposures. The performance impact varies by
+# [DISABLED] # [AUTO-COMMENTED] 	  workload, but most cases see <1% impact. Some synthetic
+# [DISABLED] 	  workloads have measured as high as 7%.
+# [DISABLED] 
+# [DISABLED] config INIT_ON_FREE_DEFAULT_ON
+# [DISABLED] 	bool "Enable heap memory zeroing on free by default"
+# [DISABLED] 	help
+# [DISABLED] 	  This has the effect of setting "init_on_free=1" on the kernel
+# [DISABLED] 	  command line. This can be disabled with "init_on_free=0".
+# [DISABLED] # [AUTO-COMMENTED] 	  Similar to "init_on_alloc", when "init_on_free" is enabled,
+# [DISABLED] 	  all page allocator and slab allocator memory will be zeroed
+# [DISABLED] # [AUTO-COMMENTED] 	  when freed, eliminating many kinds of "uninitialized heap memory"
+# [DISABLED] # [AUTO-COMMENTED] 	  flaws, especially heap content exposures. The primary difference
+# [DISABLED] # [AUTO-COMMENTED] 	  with "init_on_free" is that data lifetime in memory is reduced,
+# [DISABLED] # [AUTO-COMMENTED] 	  as anything freed is wiped immediately, making live forensics or
+# [DISABLED] 	  cold boot memory attacks unable to recover freed memory contents.
+# [DISABLED] # [AUTO-COMMENTED] 	  The performance impact varies by workload, but is more expensive
+# [DISABLED] 	  than "init_on_alloc" due to the negative cache effects of
+# [DISABLED] 	  touching "cold" memory areas. Most cases see 3-5% impact. Some
+# [DISABLED] 	  synthetic workloads have measured as high as 8%.
+# [DISABLED] 
+# [DISABLED] endmenu
+# [DISABLED] 
+# [DISABLED] endmenu
