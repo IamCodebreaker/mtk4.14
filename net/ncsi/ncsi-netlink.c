@@ -71,8 +71,8 @@ static int ncsi_write_channel_info(struct sk_buff *skb,
 	if (ndp->force_channel == nc)
 		nla_put_flag(skb, NCSI_CHANNEL_ATTR_FORCED);
 
-	nla_put_u32(skb, NCSI_CHANNEL_ATTR_VERSION_MAJOR, nc->version.version);
-	nla_put_u32(skb, NCSI_CHANNEL_ATTR_VERSION_MINOR, nc->version.alpha2);
+	nla_put_u32(skb, NCSI_CHANNEL_ATTR_VERSION_MAJOR, nc->version.major);
+	nla_put_u32(skb, NCSI_CHANNEL_ATTR_VERSION_MINOR, nc->version.minor);
 	nla_put_string(skb, NCSI_CHANNEL_ATTR_VERSION_STR, nc->version.fw_name);
 
 	vid_nest = nla_nest_start(skb, NCSI_CHANNEL_ATTR_VLAN_LIST);
@@ -100,7 +100,7 @@ static int ncsi_write_package_info(struct sk_buff *skb,
 	bool found;
 	int rc;
 
-	if (id > ndp->package_num) {
+	if (id > ndp->package_num - 1) {
 		netdev_info(ndp->ndev.dev, "NCSI: No package with id %u\n", id);
 		return -ENODEV;
 	}
@@ -177,13 +177,17 @@ static int ncsi_pkg_info_nl(struct sk_buff *msg, struct genl_info *info)
 	hdr = genlmsg_put(skb, info->snd_portid, info->snd_seq,
 			  &ncsi_genl_family, 0, NCSI_CMD_PKG_INFO);
 	if (!hdr) {
-		kfree(skb);
+		kfree_skb(skb);
 		return -EMSGSIZE;
 	}
 
 	package_id = nla_get_u32(info->attrs[NCSI_ATTR_PACKAGE_ID]);
 
 	attr = nla_nest_start(skb, NCSI_ATTR_PACKAGE_LIST);
+	if (!attr) {
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
 	rc = ncsi_write_package_info(skb, ndp, package_id);
 
 	if (rc) {
@@ -197,15 +201,14 @@ static int ncsi_pkg_info_nl(struct sk_buff *msg, struct genl_info *info)
 	return genlmsg_reply(skb, info);
 
 err:
-	genlmsg_cancel(skb, hdr);
-	kfree(skb);
+	kfree_skb(skb);
 	return rc;
 }
 
 static int ncsi_pkg_info_all_nl(struct sk_buff *skb,
 				struct netlink_callback *cb)
 {
-	struct nlattr *attrs[NCSI_ATTR_MAX];
+	struct nlattr *attrs[NCSI_ATTR_MAX + 1];
 	struct ncsi_package *np, *package;
 	struct ncsi_dev_priv *ndp;
 	unsigned int package_id;
@@ -237,7 +240,7 @@ static int ncsi_pkg_info_all_nl(struct sk_buff *skb,
 		return 0; /* done */
 
 	hdr = genlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
-			  &ncsi_genl_family, 0,  NCSI_CMD_PKG_INFO);
+			  &ncsi_genl_family, NLM_F_MULTI,  NCSI_CMD_PKG_INFO);
 	if (!hdr) {
 		rc = -EMSGSIZE;
 		goto err;
@@ -293,6 +296,7 @@ static int ncsi_set_interface_nl(struct sk_buff *msg, struct genl_info *info)
 			package = np;
 	if (!package) {
 		/* The user has set a package that does not exist */
+		spin_unlock_irqrestore(&ndp->lock, flags);
 		return -ERANGE;
 	}
 
@@ -311,6 +315,7 @@ static int ncsi_set_interface_nl(struct sk_buff *msg, struct genl_info *info)
 		/* The user has set a channel that does not exist on this
 		 * package
 		 */
+		spin_unlock_irqrestore(&ndp->lock, flags);
 		netdev_info(ndp->ndev.dev, "NCSI: Channel %u does not exist!\n",
 			    channel_id);
 		return -ERANGE;
@@ -392,24 +397,8 @@ static struct genl_family ncsi_genl_family __ro_after_init = {
 	.n_ops = ARRAY_SIZE(ncsi_ops),
 };
 
-int ncsi_init_netlink(struct net_device *dev)
+static int __init ncsi_init_netlink(void)
 {
-	int rc;
-
-	rc = genl_register_family(&ncsi_genl_family);
-	if (rc)
-		netdev_err(dev, "ncsi: failed to register netlink family\n");
-
-	return rc;
+	return genl_register_family(&ncsi_genl_family);
 }
-
-int ncsi_unregister_netlink(struct net_device *dev)
-{
-	int rc;
-
-	rc = genl_unregister_family(&ncsi_genl_family);
-	if (rc)
-		netdev_err(dev, "ncsi: failed to unregister netlink family\n");
-
-	return rc;
-}
+subsys_initcall(ncsi_init_netlink);

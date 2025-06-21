@@ -43,7 +43,7 @@ static void nft_nat_eval(const struct nft_expr *expr,
 	const struct nft_nat *priv = nft_expr_priv(expr);
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(pkt->skb, &ctinfo);
-	struct nf_nat_range range;
+	struct nf_nat_range2 range;
 
 	memset(&range, 0, sizeof(range));
 	if (priv->sreg_addr_min) {
@@ -94,6 +94,11 @@ static int nft_nat_validate(const struct nft_ctx *ctx,
 	struct nft_nat *priv = nft_expr_priv(expr);
 	int err;
 
+	if (ctx->family != NFPROTO_IPV4 &&
+	    ctx->family != NFPROTO_IPV6 &&
+	    ctx->family != NFPROTO_INET)
+		return -EOPNOTSUPP;
+
 	err = nft_chain_validate_dependency(ctx->chain, NFT_CHAIN_T_NAT);
 	if (err < 0)
 		return err;
@@ -142,7 +147,7 @@ static int nft_nat_init(const struct nft_ctx *ctx, const struct nft_expr *expr,
 		return -EINVAL;
 
 	family = ntohl(nla_get_be32(tb[NFTA_NAT_FAMILY]));
-	if (family != ctx->afi->family)
+	if (family != ctx->family)
 		return -EOPNOTSUPP;
 
 	switch (family) {

@@ -158,9 +158,9 @@ found:
 	return s;
 }
 
-static void atalk_destroy_timer(unsigned long data)
+static void atalk_destroy_timer(struct timer_list *t)
 {
-	struct sock *sk = (struct sock *)data;
+	struct sock *sk = from_timer(sk, t, sk_timer);
 
 	if (sk_has_allocations(sk)) {
 		sk->sk_timer.expires = jiffies + SOCK_DESTROY_TIME;
@@ -175,8 +175,7 @@ static inline void atalk_destroy_socket(struct sock *sk)
 	skb_queue_purge(&sk->sk_receive_queue);
 
 	if (sk_has_allocations(sk)) {
-		setup_timer(&sk->sk_timer, atalk_destroy_timer,
-				(unsigned long)sk);
+		timer_setup(&sk->sk_timer, atalk_destroy_timer, 0);
 		sk->sk_timer.expires	= jiffies + SOCK_DESTROY_TIME;
 		add_timer(&sk->sk_timer);
 	} else
@@ -1244,7 +1243,7 @@ out:
  * fields into the sockaddr.
  */
 static int atalk_getname(struct socket *sock, struct sockaddr *uaddr,
-			 int *uaddr_len, int peer)
+			 int peer)
 {
 	struct sockaddr_at sat;
 	struct sock *sk = sock->sk;
@@ -1257,7 +1256,6 @@ static int atalk_getname(struct socket *sock, struct sockaddr *uaddr,
 		if (atalk_autobind(sk) < 0)
 			goto out;
 
-	*uaddr_len = sizeof(struct sockaddr_at);
 	memset(&sat, 0, sizeof(sat));
 
 	if (peer) {
@@ -1274,9 +1272,9 @@ static int atalk_getname(struct socket *sock, struct sockaddr *uaddr,
 		sat.sat_port	    = at->src_port;
 	}
 
-	err = 0;
 	sat.sat_family = AF_APPLETALK;
 	memcpy(uaddr, &sat, sizeof(sat));
+	err = sizeof(struct sockaddr_at);
 
 out:
 	release_sock(sk);
@@ -1810,15 +1808,14 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		break;
 	}
 	case TIOCINQ: {
-		/*
-		 * These two are safe on a single CPU system as only
-		 * user tasks fiddle here
-		 */
-		struct sk_buff *skb = skb_peek(&sk->sk_receive_queue);
+		struct sk_buff *skb;
 		long amount = 0;
 
+		spin_lock_irq(&sk->sk_receive_queue.lock);
+		skb = skb_peek(&sk->sk_receive_queue);
 		if (skb)
 			amount = skb->len - sizeof(struct ddpehdr);
+		spin_unlock_irq(&sk->sk_receive_queue.lock);
 		rc = put_user(amount, (int __user *)argp);
 		break;
 	}

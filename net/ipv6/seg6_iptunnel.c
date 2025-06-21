@@ -91,6 +91,24 @@ static void set_tun_src(struct net *net, struct net_device *dev,
 	rcu_read_unlock();
 }
 
+/* Compute flowlabel for outer IPv6 header */
+static __be32 seg6_make_flowlabel(struct net *net, struct sk_buff *skb,
+				  struct ipv6hdr *inner_hdr)
+{
+	int do_flowlabel = net->ipv6.sysctl.seg6_flowlabel;
+	__be32 flowlabel = 0;
+	u32 hash;
+
+	if (do_flowlabel > 0) {
+		hash = skb_get_hash(skb);
+		hash = rol32(hash, 16);
+		flowlabel = (__force __be32)hash & IPV6_FLOWLABEL_MASK;
+	} else if (!do_flowlabel && skb->protocol == htons(ETH_P_IPV6)) {
+		flowlabel = ip6_flowlabel(inner_hdr);
+	}
+	return flowlabel;
+}
+
 /* encapsulate an IPv6 packet within an outer IPv6 header with a given SRH */
 int seg6_do_srh_encap(struct sk_buff *skb, struct ipv6_sr_hdr *osrh, int proto)
 {
@@ -99,6 +117,7 @@ int seg6_do_srh_encap(struct sk_buff *skb, struct ipv6_sr_hdr *osrh, int proto)
 	struct ipv6hdr *hdr, *inner_hdr;
 	struct ipv6_sr_hdr *isrh;
 	int hdrlen, tot_len, err;
+	__be32 flowlabel;
 
 	hdrlen = (osrh->hdrlen + 1) << 3;
 	tot_len = hdrlen + sizeof(*hdr);
@@ -108,6 +127,7 @@ int seg6_do_srh_encap(struct sk_buff *skb, struct ipv6_sr_hdr *osrh, int proto)
 		return err;
 
 	inner_hdr = ipv6_hdr(skb);
+	flowlabel = seg6_make_flowlabel(net, skb, inner_hdr);
 
 	skb_push(skb, tot_len);
 	skb_reset_network_header(skb);
@@ -121,10 +141,10 @@ int seg6_do_srh_encap(struct sk_buff *skb, struct ipv6_sr_hdr *osrh, int proto)
 
 	if (skb->protocol == htons(ETH_P_IPV6)) {
 		ip6_flow_hdr(hdr, ip6_tclass(ip6_flowinfo(inner_hdr)),
-			     ip6_flowlabel(inner_hdr));
+			     flowlabel);
 		hdr->hop_limit = inner_hdr->hop_limit;
 	} else {
-		ip6_flow_hdr(hdr, 0, 0);
+		ip6_flow_hdr(hdr, 0, flowlabel);
 		hdr->hop_limit = ip6_dst_hoplimit(skb_dst(skb));
 
 		memset(IP6CB(skb), 0, sizeof(*IP6CB(skb)));
@@ -293,9 +313,8 @@ static int seg6_input(struct sk_buff *skb)
 
 	slwt = seg6_lwt_lwtunnel(orig_dst->lwtstate);
 
-	preempt_disable();
+	local_bh_disable();
 	dst = dst_cache_get(&slwt->cache);
-	preempt_enable();
 
 	skb_dst_drop(skb);
 
@@ -303,14 +322,13 @@ static int seg6_input(struct sk_buff *skb)
 		ip6_route_input(skb);
 		dst = skb_dst(skb);
 		if (!dst->error) {
-			preempt_disable();
 			dst_cache_set_ip6(&slwt->cache, dst,
 					  &ipv6_hdr(skb)->saddr);
-			preempt_enable();
 		}
 	} else {
 		skb_dst_set(skb, dst);
 	}
+	local_bh_enable();
 
 	err = skb_cow_head(skb, LL_RESERVED_SPACE(dst->dev));
 	if (unlikely(err))
@@ -332,9 +350,9 @@ static int seg6_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 
 	slwt = seg6_lwt_lwtunnel(orig_dst->lwtstate);
 
-	preempt_disable();
+	local_bh_disable();
 	dst = dst_cache_get(&slwt->cache);
-	preempt_enable();
+	local_bh_enable();
 
 	if (unlikely(!dst)) {
 		struct ipv6hdr *hdr = ipv6_hdr(skb);
@@ -354,9 +372,9 @@ static int seg6_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 			goto drop;
 		}
 
-		preempt_disable();
+		local_bh_disable();
 		dst_cache_set_ip6(&slwt->cache, dst, &fl6.saddr);
-		preempt_enable();
+		local_bh_enable();
 	}
 
 	skb_dst_drop(skb);

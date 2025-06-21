@@ -607,18 +607,18 @@ static int nci_close_device(struct nci_dev *ndev)
 }
 
 /* NCI command timer function */
-static void nci_cmd_timer(unsigned long arg)
+static void nci_cmd_timer(struct timer_list *t)
 {
-	struct nci_dev *ndev = (void *) arg;
+	struct nci_dev *ndev = from_timer(ndev, t, cmd_timer);
 
 	atomic_set(&ndev->cmd_cnt, 1);
 	queue_work(ndev->cmd_wq, &ndev->cmd_work);
 }
 
 /* NCI data exchange timer function */
-static void nci_data_timer(unsigned long arg)
+static void nci_data_timer(struct timer_list *t)
 {
-	struct nci_dev *ndev = (void *) arg;
+	struct nci_dev *ndev = from_timer(ndev, t, data_timer);
 
 	set_bit(NCI_DATA_EXCHANGE_TO, &ndev->flags);
 	queue_work(ndev->rx_wq, &ndev->rx_work);
@@ -1209,6 +1209,10 @@ void nci_free_device(struct nci_dev *ndev)
 {
 	nfc_free_device(ndev->nfc_dev);
 	nci_hci_deallocate(ndev);
+
+	/* drop partial rx data packet if present */
+	if (ndev->rx_data_reassembly)
+		kfree_skb(ndev->rx_data_reassembly);
 	kfree(ndev);
 }
 EXPORT_SYMBOL(nci_free_device);
@@ -1254,10 +1258,8 @@ int nci_register_device(struct nci_dev *ndev)
 	skb_queue_head_init(&ndev->rx_q);
 	skb_queue_head_init(&ndev->tx_q);
 
-	setup_timer(&ndev->cmd_timer, nci_cmd_timer,
-		    (unsigned long) ndev);
-	setup_timer(&ndev->data_timer, nci_data_timer,
-		    (unsigned long) ndev);
+	timer_setup(&ndev->cmd_timer, nci_cmd_timer, 0);
+	timer_setup(&ndev->data_timer, nci_data_timer, 0);
 
 	mutex_init(&ndev->req_lock);
 	INIT_LIST_HEAD(&ndev->conn_info_list);
@@ -1459,6 +1461,19 @@ int nci_core_ntf_packet(struct nci_dev *ndev, __u16 opcode,
 				 ndev->ops->n_core_ops);
 }
 
+static bool nci_valid_size(struct sk_buff *skb)
+{
+	unsigned int hdr_size = NCI_CTRL_HDR_SIZE;
+	BUILD_BUG_ON(NCI_CTRL_HDR_SIZE != NCI_DATA_HDR_SIZE);
+
+	if (skb->len < hdr_size ||
+	    !nci_plen(skb->data) ||
+	    skb->len < hdr_size + nci_plen(skb->data)) {
+		return false;
+	}
+	return true;
+}
+
 /* ---- NCI TX Data worker thread ---- */
 
 static void nci_tx_work(struct work_struct *work)
@@ -1508,6 +1523,11 @@ static void nci_rx_work(struct work_struct *work)
 		/* Send copy to sniffer */
 		nfc_send_to_raw_sock(ndev->nfc_dev, skb,
 				     RAW_PAYLOAD_NCI, NFC_DIRECTION_RX);
+
+		if (!nci_valid_size(skb)) {
+			kfree_skb(skb);
+			continue;
+		}
 
 		/* Process frame */
 		switch (nci_mt(skb->data)) {

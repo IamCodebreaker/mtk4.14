@@ -224,8 +224,10 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 				sock_prot_inuse_add(net, sk->sk_prot, -1);
 				sock_prot_inuse_add(net, &tcp_prot, 1);
 				local_bh_enable();
-				sk->sk_prot = &tcp_prot;
-				icsk->icsk_af_ops = &ipv4_specific;
+				/* Paired with READ_ONCE(sk->sk_prot) in inet6_stream_ops */
+				WRITE_ONCE(sk->sk_prot, &tcp_prot);
+				/* Paired with READ_ONCE() in tcp_(get|set)sockopt() */
+				WRITE_ONCE(icsk->icsk_af_ops, &ipv4_specific);
 				sk->sk_socket->ops = &inet_stream_ops;
 				sk->sk_family = PF_INET;
 				tcp_sync_mss(sk, icsk->icsk_pmtu_cookie);
@@ -238,7 +240,8 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 				sock_prot_inuse_add(net, sk->sk_prot, -1);
 				sock_prot_inuse_add(net, prot, 1);
 				local_bh_enable();
-				sk->sk_prot = prot;
+				/* Paired with READ_ONCE(sk->sk_prot) in inet6_dgram_ops */
+				WRITE_ONCE(sk->sk_prot, prot);
 				sk->sk_socket->ops = &inet_dgram_ops;
 				sk->sk_family = PF_INET;
 			}
@@ -386,6 +389,14 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 		retv = 0;
 		break;
 
+	case IPV6_FREEBIND:
+		if (optlen < sizeof(int))
+			goto e_inval;
+		/* we also don't have a separate freebind bit for IPV6 */
+		inet_sk(sk)->freebind = valbool;
+		retv = 0;
+		break;
+
 	case IPV6_RECVORIGDSTADDR:
 		if (optlen < sizeof(int))
 			goto e_inval;
@@ -501,7 +512,6 @@ sticky_done:
 		struct ipv6_txoptions *opt = NULL;
 		struct msghdr msg;
 		struct flowi6 fl6;
-		struct sockcm_cookie sockc_junk;
 		struct ipcm6_cookie ipc6;
 
 		memset(&fl6, 0, sizeof(fl6));
@@ -534,7 +544,7 @@ sticky_done:
 		msg.msg_control = (void *)(opt+1);
 		ipc6.opt = opt;
 
-		retv = ip6_datagram_send_ctl(net, sk, &msg, &fl6, &ipc6, &sockc_junk);
+		retv = ip6_datagram_send_ctl(net, sk, &msg, &fl6, &ipc6);
 		if (retv)
 			goto done;
 update:
@@ -730,8 +740,9 @@ done:
 			struct sockaddr_in6 *psin6;
 
 			psin6 = (struct sockaddr_in6 *)&greqs.gsr_group;
-			retv = ipv6_sock_mc_join(sk, greqs.gsr_interface,
-						 &psin6->sin6_addr);
+			retv = ipv6_sock_mc_join_ssm(sk, greqs.gsr_interface,
+						     &psin6->sin6_addr,
+						     MCAST_INCLUDE);
 			/* prior join w/ different source is ok */
 			if (retv && retv != -EADDRINUSE)
 				break;
@@ -1229,6 +1240,10 @@ static int do_ipv6_getsockopt(struct sock *sk, int level, int optname,
 		val = inet_sk(sk)->transparent;
 		break;
 
+	case IPV6_FREEBIND:
+		val = inet_sk(sk)->freebind;
+		break;
+
 	case IPV6_RECVORIGDSTADDR:
 		val = np->rxopt.bits.rxorigdstaddr;
 		break;
@@ -1424,4 +1439,3 @@ int compat_ipv6_getsockopt(struct sock *sk, int level, int optname,
 }
 EXPORT_SYMBOL(compat_ipv6_getsockopt);
 #endif
-

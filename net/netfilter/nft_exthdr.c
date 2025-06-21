@@ -10,11 +10,10 @@
 
 #include <asm/unaligned.h>
 #include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
 #include <linux/netlink.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter/nf_tables.h>
+#include <net/netfilter/nf_tables_core.h>
 #include <net/netfilter/nf_tables.h>
 #include <net/tcp.h>
 
@@ -35,6 +34,14 @@ static unsigned int optlen(const u8 *opt, unsigned int offset)
 		return 1;
 	else
 		return opt[offset + 1];
+}
+
+static int nft_skb_copy_to_reg(const struct sk_buff *skb, int offset, u32 *dest, unsigned int len)
+{
+	if (len % NFT_REG32_SIZE)
+		dest[len / NFT_REG32_SIZE] = 0;
+
+	return skb_copy_bits(skb, offset, dest, len);
 }
 
 static void nft_exthdr_ipv6_eval(const struct nft_expr *expr,
@@ -58,8 +65,7 @@ static void nft_exthdr_ipv6_eval(const struct nft_expr *expr,
 	}
 	offset += priv->offset;
 
-	dest[priv->len / NFT_REG32_SIZE] = 0;
-	if (skb_copy_bits(pkt->skb, offset, dest, priv->len) < 0)
+	if (nft_skb_copy_to_reg(pkt->skb, offset, dest, priv->len) < 0)
 		goto err;
 	return;
 err:
@@ -115,7 +121,8 @@ static void nft_exthdr_tcp_eval(const struct nft_expr *expr,
 		if (priv->flags & NFT_EXTHDR_F_PRESENT) {
 			*dest = 1;
 		} else {
-			dest[priv->len / NFT_REG32_SIZE] = 0;
+			if (priv->len % NFT_REG32_SIZE)
+				dest[priv->len / NFT_REG32_SIZE] = 0;
 			memcpy(dest, opt + offset, priv->len);
 		}
 
@@ -215,6 +222,8 @@ static const struct nla_policy nft_exthdr_policy[NFTA_EXTHDR_MAX + 1] = {
 	[NFTA_EXTHDR_OFFSET]		= { .type = NLA_U32 },
 	[NFTA_EXTHDR_LEN]		= { .type = NLA_U32 },
 	[NFTA_EXTHDR_FLAGS]		= { .type = NLA_U32 },
+	[NFTA_EXTHDR_OP]		= { .type = NLA_U32 },
+	[NFTA_EXTHDR_SREG]		= { .type = NLA_U32 },
 };
 
 static int nft_exthdr_init(const struct nft_ctx *ctx,
@@ -352,7 +361,6 @@ static int nft_exthdr_dump_set(struct sk_buff *skb, const struct nft_expr *expr)
 	return nft_exthdr_dump_common(skb, priv);
 }
 
-static struct nft_expr_type nft_exthdr_type;
 static const struct nft_expr_ops nft_exthdr_ipv6_ops = {
 	.type		= &nft_exthdr_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_exthdr)),
@@ -406,27 +414,10 @@ nft_exthdr_select_ops(const struct nft_ctx *ctx,
 	return ERR_PTR(-EOPNOTSUPP);
 }
 
-static struct nft_expr_type nft_exthdr_type __read_mostly = {
+struct nft_expr_type nft_exthdr_type __read_mostly = {
 	.name		= "exthdr",
 	.select_ops	= nft_exthdr_select_ops,
 	.policy		= nft_exthdr_policy,
 	.maxattr	= NFTA_EXTHDR_MAX,
 	.owner		= THIS_MODULE,
 };
-
-static int __init nft_exthdr_module_init(void)
-{
-	return nft_register_expr(&nft_exthdr_type);
-}
-
-static void __exit nft_exthdr_module_exit(void)
-{
-	nft_unregister_expr(&nft_exthdr_type);
-}
-
-module_init(nft_exthdr_module_init);
-module_exit(nft_exthdr_module_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Patrick McHardy <kaber@trash.net>");
-MODULE_ALIAS_NFT_EXPR("exthdr");

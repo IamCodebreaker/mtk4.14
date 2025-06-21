@@ -121,7 +121,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/skbuff.h>
+
 #include <linux/net.h>
 #include <linux/socket.h>
 #include <linux/sockios.h>
@@ -159,7 +159,7 @@ bool ip_call_ra_chain(struct sk_buff *skb)
 	struct net_device *dev = skb->dev;
 	struct net *net = dev_net(dev);
 
-	for (ra = rcu_dereference(ip_ra_chain); ra; ra = rcu_dereference(ra->next)) {
+	for (ra = rcu_dereference(net->ipv4.ra_chain); ra; ra = rcu_dereference(ra->next)) {
 		struct sock *sk = ra->sk;
 
 		/* If socket is bound to an interface, only report
@@ -167,8 +167,7 @@ bool ip_call_ra_chain(struct sk_buff *skb)
 		 */
 		if (sk && inet_sk(sk)->inet_num == protocol &&
 		    (!sk->sk_bound_dev_if ||
-		     sk->sk_bound_dev_if == dev->ifindex) &&
-		    net_eq(sock_net(sk), net)) {
+		     sk->sk_bound_dev_if == dev->ifindex)) {
 			if (ip_is_fragment(ip_hdr(skb))) {
 				if (ip_defrag(net, skb, IP_DEFRAG_CALL_RA_CHAIN))
 					return true;
@@ -215,8 +214,7 @@ resubmit:
 	} else {
 		if (!raw) {
 			if (xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
-				__IP_INC_STATS(net,
-					       IPSTATS_MIB_INUNKNOWNPROTOS);
+				__IP_INC_STATS(net, IPSTATS_MIB_INUNKNOWNPROTOS);
 				icmp_send(skb, ICMP_DEST_UNREACH,
 					  ICMP_PROT_UNREACH, 0);
 			}
@@ -228,8 +226,7 @@ resubmit:
 	}
 }
 
-static int ip_local_deliver_finish(struct net *net, struct sock *sk,
-				   struct sk_buff *skb)
+static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	__skb_pull(skb, skb_network_header_len(skb));
 
@@ -308,39 +305,28 @@ drop:
 	return true;
 }
 
-int udp_v4_early_demux(struct sk_buff *);
-int tcp_v4_early_demux(struct sk_buff *);
 static int ip_rcv_finish_core(struct net *net, struct sock *sk,
-			      struct sk_buff *skb)
+			      struct sk_buff *skb, struct net_device *dev)
 {
 	const struct iphdr *iph = ip_hdr(skb);
-	struct net_device *dev = skb->dev;
+	int (*edemux)(struct sk_buff *skb);
 	struct rtable *rt;
 	int err;
 
-	if (READ_ONCE(net->ipv4.sysctl_ip_early_demux) &&
+	if (net->ipv4.sysctl_ip_early_demux &&
 	    !skb_dst(skb) &&
 	    !skb->sk &&
 	    !ip_is_fragment(iph)) {
-		switch (iph->protocol) {
-		case IPPROTO_TCP:
-			if (READ_ONCE(net->ipv4.sysctl_tcp_early_demux)) {
-				tcp_v4_early_demux(skb);
+		const struct net_protocol *ipprot;
+		int protocol = iph->protocol;
 
-				/* must reload iph, skb->head might have changed */
-				iph = ip_hdr(skb);
-			}
-			break;
-		case IPPROTO_UDP:
-			if (READ_ONCE(net->ipv4.sysctl_udp_early_demux)) {
-				err = udp_v4_early_demux(skb);
-				if (unlikely(err))
-					goto drop_error;
-
-				/* must reload iph, skb->head might have changed */
-				iph = ip_hdr(skb);
-			}
-			break;
+		ipprot = rcu_dereference(inet_protos[protocol]);
+		if (ipprot && (edemux = READ_ONCE(ipprot->early_demux))) {
+			err = edemux(skb);
+			if (unlikely(err))
+				goto drop_error;
+			/* must reload iph, skb->head might have changed */
+			iph = ip_hdr(skb);
 		}
 	}
 
@@ -412,6 +398,7 @@ drop_error:
 
 static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
+	struct net_device *dev = skb->dev;
 	int ret;
 
 	/* if ingress device is enslaved to an L3 master device pass the
@@ -421,7 +408,7 @@ static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 	if (!skb)
 		return NET_RX_SUCCESS;
 
-	ret = ip_rcv_finish_core(net, sk, skb);
+	ret = ip_rcv_finish_core(net, sk, skb, dev);
 	if (ret != NET_RX_DROP)
 		ret = dst_input(skb);
 	return ret;
@@ -561,6 +548,7 @@ static void ip_list_rcv_finish(struct net *net, struct sock *sk,
 
 	INIT_LIST_HEAD(&sublist);
 	list_for_each_entry_safe(skb, next, head, list) {
+		struct net_device *dev = skb->dev;
 		struct dst_entry *dst;
 
 		skb_list_del_init(skb);
@@ -570,7 +558,7 @@ static void ip_list_rcv_finish(struct net *net, struct sock *sk,
 		skb = l3mdev_ip_rcv(skb);
 		if (!skb)
 			continue;
-		if (ip_rcv_finish_core(net, sk, skb) == NET_RX_DROP)
+		if (ip_rcv_finish_core(net, sk, skb, dev) == NET_RX_DROP)
 			continue;
 
 		dst = skb_dst(skb);
@@ -629,4 +617,3 @@ void ip_list_rcv(struct list_head *head, struct packet_type *pt,
 	/* dispatch final sublist */
 	ip_sublist_rcv(&sublist, curr_dev, curr_net);
 }
-

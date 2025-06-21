@@ -47,25 +47,18 @@
 #include <net/inet_ecn.h>
 #include <net/dst_metadata.h>
 
-void udp_v6_early_demux(struct sk_buff *);
-void tcp_v6_early_demux(struct sk_buff *);
 static void ip6_rcv_finish_core(struct net *net, struct sock *sk,
 				struct sk_buff *skb)
 {
-	if (READ_ONCE(net->ipv4.sysctl_ip_early_demux) &&
-	    !skb_dst(skb) && !skb->sk) {
-		switch (ipv6_hdr(skb)->nexthdr) {
-		case IPPROTO_TCP:
-			if (READ_ONCE(net->ipv4.sysctl_tcp_early_demux))
-				tcp_v6_early_demux(skb);
-			break;
-		case IPPROTO_UDP:
-			if (READ_ONCE(net->ipv4.sysctl_udp_early_demux))
-				udp_v6_early_demux(skb);
-			break;
-		}
-	}
+	void (*edemux)(struct sk_buff *skb);
 
+	if (net->ipv4.sysctl_ip_early_demux && !skb_dst(skb) && skb->sk == NULL) {
+		const struct inet6_protocol *ipprot;
+
+		ipprot = rcu_dereference(inet6_protos[ipv6_hdr(skb)->nexthdr]);
+		if (ipprot && (edemux = READ_ONCE(ipprot->early_demux)))
+			edemux(skb);
+	}
 	if (!skb_valid_dst(skb))
 		ip6_route_input(skb);
 }
@@ -87,8 +80,10 @@ static void ip6_sublist_rcv_finish(struct list_head *head)
 {
 	struct sk_buff *skb, *next;
 
-	list_for_each_entry_safe(skb, next, head, list)
+	list_for_each_entry_safe(skb, next, head, list) {
+		skb_list_del_init(skb);
 		dst_input(skb);
+	}
 }
 
 static void ip6_list_rcv_finish(struct net *net, struct sock *sk,
@@ -422,8 +417,7 @@ discard:
 	kfree_skb(skb);
 }
 
-static int ip6_input_finish(struct net *net, struct sock *sk,
-			    struct sk_buff *skb)
+static int ip6_input_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	rcu_read_lock();
 	ip6_protocol_deliver_rcu(net, skb, 0, false);
@@ -447,7 +441,7 @@ int ip6_mc_input(struct sk_buff *skb)
 	bool deliver;
 
 	__IP6_UPD_PO_STATS(dev_net(skb_dst(skb)->dev),
-			 ip6_dst_idev(skb_dst(skb)), IPSTATS_MIB_INMCAST,
+			 __in6_dev_get_safely(skb->dev), IPSTATS_MIB_INMCAST,
 			 skb->len);
 
 	hdr = ipv6_hdr(skb);
