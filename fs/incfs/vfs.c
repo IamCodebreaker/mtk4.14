@@ -31,9 +31,6 @@
 #define READ_EXEC_FILE_MODE 0555
 #define READ_WRITE_FILE_MODE 0666
 
-/* Needed for kernel 4.14 - remove for later kernels */
-typedef unsigned int __poll_t;
-
 static int incfs_remount_fs(struct super_block *sb, int *flags, char *data);
 
 static int dentry_revalidate(struct dentry *dentry, unsigned int flags);
@@ -404,7 +401,7 @@ static int inode_set(struct inode *inode, void *opaque)
 	} else if (search->ino == INCFS_PENDING_READS_INODE) {
 		/* It's an inode for .pending_reads pseudo file. */
 
-		inode->i_ctime = (struct timespec){};
+		inode->i_ctime = (struct timespec64){};
 		inode->i_mtime = inode->i_ctime;
 		inode->i_atime = inode->i_ctime;
 		inode->i_size = 0;
@@ -419,7 +416,7 @@ static int inode_set(struct inode *inode, void *opaque)
 	} else if (search->ino == INCFS_LOG_INODE) {
 		/* It's an inode for .log pseudo file. */
 
-		inode->i_ctime = (struct timespec){};
+		inode->i_ctime = (struct timespec64){};
 		inode->i_mtime = inode->i_ctime;
 		inode->i_atime = inode->i_ctime;
 		inode->i_size = 0;
@@ -1055,7 +1052,7 @@ static int dir_relative_path_resolve(
 		LOOKUP_FOLLOW | LOOKUP_DIRECTORY, result_path, NULL);
 
 out:
-	sys_close(dir_fd);
+	ksys_close(dir_fd);
 	if (error)
 		pr_debug("incfs: %s %d\n", __func__, error);
 	return error;
@@ -2192,7 +2189,7 @@ struct dentry *incfs_mount_fs(struct file_system_type *type, int flags,
 	sb->s_op = &incfs_super_ops;
 	sb->s_d_op = &incfs_dentry_ops;
 	sb->s_flags |= S_NOATIME;
-	sb->s_magic = INCFS_MAGIC_NUMBER;
+	sb->s_magic = (long)INCFS_MAGIC_NUMBER;
 	sb->s_time_gran = 1;
 	sb->s_blocksize = INCFS_DATA_FILE_BLOCK_SIZE;
 	sb->s_blocksize_bits = blksize_bits(sb->s_blocksize);

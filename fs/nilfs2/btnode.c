@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * btnode.c - NILFS B-tree node cache
  *
  * Copyright (C) 2005-2008 Nippon Telegraph and Telephone Corporation.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  *
  * Originally written by Seiji Kihara.
  * Fully revised by Ryusuke Konishi for stabilization and simplification.
@@ -60,12 +51,21 @@ nilfs_btnode_create_block(struct address_space *btnc, __u64 blocknr)
 
 	bh = nilfs_grab_buffer(inode, btnc, blocknr, BIT(BH_NILFS_Node));
 	if (unlikely(!bh))
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	if (unlikely(buffer_mapped(bh) || buffer_uptodate(bh) ||
 		     buffer_dirty(bh))) {
-		brelse(bh);
-		BUG();
+		/*
+		 * The block buffer at the specified new address was already
+		 * in use.  This can happen if it is a virtual block number
+		 * and has been reallocated due to corruption of the bitmap
+		 * used to manage its allocation state (if not, the buffer
+		 * clearing of an abandoned b-tree node is missing somewhere).
+		 */
+		nilfs_error(inode->i_sb,
+			    "state inconsistency probably due to duplicate use of b-tree node block address %llu (ino=%lu)",
+			    (unsigned long long)blocknr, inode->i_ino);
+		goto failed;
 	}
 	memset(bh->b_data, 0, i_blocksize(inode));
 	bh->b_bdev = inode->i_sb->s_bdev;
@@ -76,6 +76,12 @@ nilfs_btnode_create_block(struct address_space *btnc, __u64 blocknr)
 	unlock_page(bh->b_page);
 	put_page(bh->b_page);
 	return bh;
+
+failed:
+	unlock_page(bh->b_page);
+	put_page(bh->b_page);
+	brelse(bh);
+	return ERR_PTR(-EIO);
 }
 
 int nilfs_btnode_submit_block(struct address_space *btnc, __u64 blocknr,
@@ -210,9 +216,9 @@ retry:
 				       (unsigned long long)oldkey,
 				       (unsigned long long)newkey);
 
-		spin_lock_irq(&btnc->tree_lock);
-		err = radix_tree_insert(&btnc->page_tree, newkey, obh->b_page);
-		spin_unlock_irq(&btnc->tree_lock);
+		xa_lock_irq(&btnc->i_pages);
+		err = radix_tree_insert(&btnc->i_pages, newkey, obh->b_page);
+		xa_unlock_irq(&btnc->i_pages);
 		/*
 		 * Note: page->index will not change to newkey until
 		 * nilfs_btnode_commit_change_key() will be called.
@@ -233,8 +239,8 @@ retry:
 	}
 
 	nbh = nilfs_btnode_create_block(btnc, newkey);
-	if (!nbh)
-		return -ENOMEM;
+	if (IS_ERR(nbh))
+		return PTR_ERR(nbh);
 
 	BUG_ON(nbh == obh);
 	ctxt->newbh = nbh;
@@ -268,11 +274,11 @@ void nilfs_btnode_commit_change_key(struct address_space *btnc,
 				       (unsigned long long)newkey);
 		mark_buffer_dirty(obh);
 
-		spin_lock_irq(&btnc->tree_lock);
-		radix_tree_delete(&btnc->page_tree, oldkey);
-		radix_tree_tag_set(&btnc->page_tree, newkey,
+		xa_lock_irq(&btnc->i_pages);
+		radix_tree_delete(&btnc->i_pages, oldkey);
+		radix_tree_tag_set(&btnc->i_pages, newkey,
 				   PAGECACHE_TAG_DIRTY);
-		spin_unlock_irq(&btnc->tree_lock);
+		xa_unlock_irq(&btnc->i_pages);
 
 		opage->index = obh->b_blocknr = newkey;
 		unlock_page(opage);
@@ -300,9 +306,9 @@ void nilfs_btnode_abort_change_key(struct address_space *btnc,
 		return;
 
 	if (nbh == NULL) {	/* blocksize == pagesize */
-		spin_lock_irq(&btnc->tree_lock);
-		radix_tree_delete(&btnc->page_tree, newkey);
-		spin_unlock_irq(&btnc->tree_lock);
+		xa_lock_irq(&btnc->i_pages);
+		radix_tree_delete(&btnc->i_pages, newkey);
+		xa_unlock_irq(&btnc->i_pages);
 		unlock_page(ctxt->bh->b_page);
 	} else {
 		/*

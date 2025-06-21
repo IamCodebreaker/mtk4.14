@@ -115,7 +115,7 @@ static void destroy_inodecache(void)
 static int isofs_remount(struct super_block *sb, int *flags, char *data)
 {
 	sync_filesystem(sb);
-	if (!(*flags & MS_RDONLY))
+	if (!(*flags & SB_RDONLY))
 		return -EROFS;
 	return 0;
 }
@@ -910,8 +910,22 @@ root_found:
 	 * we then decide whether to use the Joliet descriptor.
 	 */
 	inode = isofs_iget(s, sbi->s_firstdatazone, 0);
-	if (IS_ERR(inode))
-		goto out_no_root;
+
+	/*
+	 * Fix for broken CDs with a corrupt root inode but a correct Joliet
+	 * root directory.
+	 */
+	if (IS_ERR(inode)) {
+		if (joliet_level && sbi->s_firstdatazone != first_data_zone) {
+			printk(KERN_NOTICE
+			       "ISOFS: root inode is unusable. "
+			       "Disabling Rock Ridge and switching to Joliet.");
+			sbi->s_rock = 0;
+			inode = NULL;
+		} else {
+			goto out_no_root;
+		}
+	}
 
 	/*
 	 * Fix for broken CDs with Rock Ridge and empty ISO root directory but

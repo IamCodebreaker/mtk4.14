@@ -12,14 +12,14 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/sched/signal.h>
 #include <linux/module.h>
 #include <linux/compat.h>
 #include <linux/swap.h>
 #include <linux/falloc.h>
 #include <linux/uio.h>
 #include <linux/fs.h>
-
-#include <trace/events/android_fs.h>
+#include <mt-plat/mtk_blocktag.h>
 
 static const struct file_operations fuse_direct_io_file_operations;
 
@@ -137,7 +137,7 @@ int fuse_do_open(struct fuse_conn *fc, u64 nodeid, struct file *file,
 		if (!err) {
 			ff->fh = outarg.fh;
 			ff->open_flags = outarg.open_flags;
-
+			fuse_passthrough_setup(fc, ff, &outarg);
 		} else if (err != -ENOSYS || isdir) {
 			fuse_file_free(ff);
 			return err;
@@ -179,12 +179,11 @@ void fuse_finish_open(struct inode *inode, struct file *file)
 
 	if (ff->open_flags & FOPEN_DIRECT_IO)
 		file->f_op = &fuse_direct_io_file_operations;
-	if (!(ff->open_flags & FOPEN_KEEP_CACHE))
-		invalidate_inode_pages2(inode->i_mapping);
 	if (ff->open_flags & FOPEN_STREAM)
 		stream_open(inode, file);
 	else if (ff->open_flags & FOPEN_NONSEEKABLE)
 		nonseekable_open(inode, file);
+
 	if (fc->atomic_o_trunc && (file->f_flags & O_TRUNC)) {
 		struct fuse_inode *fi = get_fuse_inode(inode);
 
@@ -192,10 +191,14 @@ void fuse_finish_open(struct inode *inode, struct file *file)
 		fi->attr_version = ++fc->attr_version;
 		i_size_write(inode, 0);
 		spin_unlock(&fc->lock);
+		truncate_pagecache(inode, 0);
 		fuse_invalidate_attr(inode);
 		if (fc->writeback_cache)
 			file_update_time(file);
+	} else if (!(ff->open_flags & FOPEN_KEEP_CACHE)) {
+		invalidate_inode_pages2(inode->i_mapping);
 	}
+
 	if ((file->f_mode & FMODE_WRITE) && fc->writeback_cache)
 		fuse_link_write_file(file);
 }
@@ -261,6 +264,8 @@ void fuse_release_common(struct file *file, bool isdir)
 	struct fuse_file *ff = file->private_data;
 	struct fuse_req *req = ff->reserved_req;
 	int opcode = isdir ? FUSE_RELEASEDIR : FUSE_RELEASE;
+
+	fuse_passthrough_release(&ff->passthrough);
 
 	fuse_prepare_release(ff, file->f_flags, opcode);
 
@@ -465,14 +470,6 @@ int fuse_fsync_common(struct file *file, loff_t start, loff_t end,
 
 	inode_lock(inode);
 
-	if (trace_android_fs_fsync_start_enabled()) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-		path = android_fstrace_get_pathname(pathbuf,
-				MAX_TRACE_PATHBUF_LEN, inode);
-		trace_android_fs_fsync_start(inode,
-				current->pid, path, current->comm);
-	}
-
 	/*
 	 * Start writeback against all dirty pages of the inode, then
 	 * wait for all outstanding writes, before sending the FSYNC
@@ -517,7 +514,6 @@ int fuse_fsync_common(struct file *file, loff_t start, loff_t end,
 		err = 0;
 	}
 out:
-	trace_android_fs_fsync_end(inode, start, end - start);
 	inode_unlock(inode);
 	return err;
 }
@@ -740,16 +736,6 @@ static int fuse_do_readpage(struct file *file, struct page *page)
 	u64 attr_ver;
 	int err;
 
-	if (trace_android_fs_dataread_start_enabled()) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-		path = android_fstrace_get_pathname(pathbuf,
-						    MAX_TRACE_PATHBUF_LEN,
-						    inode);
-		trace_android_fs_dataread_start(inode, pos, count,
-						current->pid, path,
-						current->comm);
-	}
-
 	/*
 	 * Page writeback can extend beyond the lifetime of the
 	 * page-cache page, so make sure we read a properly synced
@@ -783,7 +769,6 @@ static int fuse_do_readpage(struct file *file, struct page *page)
 		SetPageUptodate(page);
 	}
 
-	trace_android_fs_dataread_end(inode, pos, count);
 	fuse_put_request(fc, req);
 
 	return err;
@@ -838,11 +823,6 @@ static void fuse_readpages_end(struct fuse_conn *fc, struct fuse_req *req)
 	}
 	if (req->ff)
 		fuse_file_put(req->ff, false, false);
-
-	if (trace_android_fs_dataread_end_enabled()) {
-		struct inode *inode = mapping->host;
-		trace_android_fs_dataread_end(inode, page_offset(req->pages[0]), num_read);
-	}
 }
 
 static void fuse_send_readpages(struct fuse_req *req, struct file *file)
@@ -857,6 +837,10 @@ static void fuse_send_readpages(struct fuse_req *req, struct file *file)
 	req->out.page_replace = 1;
 	fuse_read_fill(req, file, pos, count, FUSE_READ);
 	req->misc.read.attr_ver = fuse_get_attr_version(fc);
+
+	mtk_btag_pidlog_set_pid_pages(req->pages, req->num_pages,
+				      PIDLOG_MODE_FS_FUSE, false);
+
 	if (fc->async_read) {
 		req->ff = fuse_file_get(ff);
 		req->end = fuse_readpages_end;
@@ -875,9 +859,9 @@ struct fuse_fill_data {
 	unsigned nr_pages;
 };
 
-static int fuse_readpages_fill(struct file *_data, struct page *page)
+static int fuse_readpages_fill(void *_data, struct page *page)
 {
-	struct fuse_fill_data *data = (struct fuse_fill_data *)_data;
+	struct fuse_fill_data *data = _data;
 	struct fuse_req *req = data->req;
 	struct inode *inode = data->inode;
 	struct fuse_conn *fc = get_fuse_conn(inode);
@@ -943,22 +927,10 @@ static int fuse_readpages(struct file *file, struct address_space *mapping,
 
 	err = read_cache_pages(mapping, pages, fuse_readpages_fill, &data);
 	if (!err) {
-		if (data.req->num_pages) {
-			if (trace_android_fs_dataread_start_enabled()) {
-				char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-				loff_t pos = page_offset(data.req->pages[0]);
-				size_t count = data.req->num_pages << PAGE_SHIFT;
-				path = android_fstrace_get_pathname(pathbuf,
-							MAX_TRACE_PATHBUF_LEN,
-							inode);
-				trace_android_fs_dataread_start(inode, pos, count,
-						current->pid, path,
-						current->comm);
-			}
+		if (data.req->num_pages)
 			fuse_send_readpages(data.req, file);
-		} else {
+		else
 			fuse_put_request(fc, data.req);
-		}
 	}
 out:
 	return err;
@@ -968,6 +940,10 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
 	struct inode *inode = iocb->ki_filp->f_mapping->host;
 	struct fuse_conn *fc = get_fuse_conn(inode);
+	struct fuse_file *ff = iocb->ki_filp->private_data;
+
+	if (is_bad_inode(inode))
+		return -EIO;
 
 	if (fuse_is_bad(inode))
 		return -EIO;
@@ -985,7 +961,10 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 			return err;
 	}
 
-	return generic_file_read_iter(iocb, to);
+	if (ff->passthrough.filp)
+		return fuse_passthrough_read_iter(iocb, to);
+	else
+		return generic_file_read_iter(iocb, to);
 }
 
 static void fuse_write_fill(struct fuse_req *req, struct fuse_file *ff,
@@ -1175,16 +1154,6 @@ static ssize_t fuse_perform_write(struct kiocb *iocb,
 	if (fuse_is_bad(inode))
 		return -EIO;
 
-	if (trace_android_fs_datawrite_start_enabled()) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-		path = android_fstrace_get_pathname(pathbuf,
-						    MAX_TRACE_PATHBUF_LEN,
-						    inode);
-		trace_android_fs_datawrite_start(inode, pos, iov_iter_count(ii),
-						current->pid, path,
-						current->comm);
-	}
-
 	if (inode->i_size < pos + iov_iter_count(ii))
 		set_bit(FUSE_I_SIZE_UNSTABLE, &fi->state);
 
@@ -1205,6 +1174,11 @@ static ssize_t fuse_perform_write(struct kiocb *iocb,
 		} else {
 			size_t num_written;
 
+			mtk_btag_pidlog_set_pid_pages(req->pages,
+						      req->num_pages,
+						      PIDLOG_MODE_FS_FUSE,
+						      true);
+
 			num_written = fuse_send_write_pages(req, iocb, inode,
 							    pos, count);
 			err = req->out.h.error;
@@ -1223,7 +1197,6 @@ static ssize_t fuse_perform_write(struct kiocb *iocb,
 	if (res > 0)
 		fuse_write_update_size(inode, pos);
 
-	trace_android_fs_datawrite_end(inode, pos, iov_iter_count(ii));
 	clear_bit(FUSE_I_SIZE_UNSTABLE, &fi->state);
 	fuse_invalidate_attr(inode);
 
@@ -1234,11 +1207,15 @@ static ssize_t fuse_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct file *file = iocb->ki_filp;
 	struct address_space *mapping = file->f_mapping;
+	struct fuse_file *ff = file->private_data;
 	ssize_t written = 0;
 	ssize_t written_buffered = 0;
 	struct inode *inode = mapping->host;
 	ssize_t err;
 	loff_t endbyte = 0;
+
+	if (ff->passthrough.filp)
+		return fuse_passthrough_write_iter(iocb, from);
 
 	if (fuse_is_bad(inode))
 		return -EIO;
@@ -1409,25 +1386,6 @@ ssize_t fuse_direct_io(struct fuse_io_priv *io, struct iov_iter *iter,
 	struct fuse_req *req;
 	int err = 0;
 
-	if (trace_android_fs_dataread_start_enabled() && !write) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-		path = android_fstrace_get_pathname(pathbuf,
-						    MAX_TRACE_PATHBUF_LEN,
-						    inode);
-		trace_android_fs_dataread_start(inode, pos, count,
-						current->pid, path,
-						current->comm);
-	}
-	if (trace_android_fs_datawrite_start_enabled() && write) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-		path = android_fstrace_get_pathname(pathbuf,
-						    MAX_TRACE_PATHBUF_LEN,
-						    inode);
-		trace_android_fs_datawrite_start(inode, pos, count,
-						current->pid, path,
-						current->comm);
-	}
-
 	if (io->async)
 		req = fuse_get_req_for_background(fc, fuse_iter_npages(iter));
 	else
@@ -1485,12 +1443,6 @@ ssize_t fuse_direct_io(struct fuse_io_priv *io, struct iov_iter *iter,
 	}
 	if (!IS_ERR(req))
 		fuse_put_request(fc, req);
-
-	if (trace_android_fs_dataread_end_enabled() && !write)
-		trace_android_fs_dataread_end(inode, pos, count);
-	if (trace_android_fs_datawrite_end_enabled() && write)
-		trace_android_fs_datawrite_end(inode, pos, count);
-
 	if (res > 0)
 		*ppos = pos;
 
@@ -1504,9 +1456,13 @@ static ssize_t __fuse_direct_read(struct fuse_io_priv *io,
 {
 	ssize_t res;
 	struct inode *inode = file_inode(io->iocb->ki_filp);
+	struct fuse_file *ff = io->iocb->ki_filp->private_data;
 
 	if (fuse_is_bad(inode))
 		return -EIO;
+
+	if (ff->passthrough.filp)
+		return fuse_passthrough_read_iter(io->iocb, iter);
 
 	res = fuse_direct_io(io, iter, ppos, 0);
 
@@ -1525,10 +1481,14 @@ static ssize_t fuse_direct_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct inode *inode = file_inode(iocb->ki_filp);
 	struct fuse_io_priv io = FUSE_IO_PRIV_SYNC(iocb);
+	struct fuse_file *ff = iocb->ki_filp->private_data;
 	ssize_t res;
 
 	if (fuse_is_bad(inode))
 		return -EIO;
+
+	if (ff->passthrough.filp)
+		return fuse_passthrough_write_iter(iocb, from);
 
 	/* Don't allow parallel writes to the same file */
 	inode_lock(inode);
@@ -1704,6 +1664,17 @@ int fuse_write_inode(struct inode *inode, struct writeback_control *wbc)
 	struct fuse_inode *fi = get_fuse_inode(inode);
 	struct fuse_file *ff;
 	int err;
+
+	/*
+	 * Inode is always written before the last reference is dropped and
+	 * hence this should not be reached from reclaim.
+	 *
+	 * Writing back the inode from reclaim can deadlock if the request
+	 * processing itself needs an allocation.  Allocations triggering
+	 * reclaim while serving a request can't be prevented, because it can
+	 * involve any number of unrelated userspace processes.
+	 */
+	WARN_ON(wbc->for_reclaim);
 
 	ff = __fuse_write_file_get(fc, fi);
 	err = fuse_flush_times(inode, ff);
@@ -2043,19 +2014,8 @@ static int fuse_write_begin(struct file *file, struct address_space *mapping,
 	struct page *page;
 	loff_t fsize;
 	int err = -ENOMEM;
-	struct inode *inode = mapping->host;
 
 	WARN_ON(!fc->writeback_cache);
-
-	if (trace_android_fs_datawrite_start_enabled()) {
-		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
-		path = android_fstrace_get_pathname(pathbuf,
-						    MAX_TRACE_PATHBUF_LEN,
-						    inode);
-		trace_android_fs_datawrite_start(inode, pos, len,
-						current->pid, path,
-						current->comm);
-	}
 
 	page = grab_cache_page_write_begin(mapping, index, flags);
 	if (!page)
@@ -2081,6 +2041,7 @@ static int fuse_write_begin(struct file *file, struct address_space *mapping,
 		goto cleanup;
 success:
 	*pagep = page;
+	mtk_btag_pidlog_set_pid(page, PIDLOG_MODE_FS_FUSE, true);
 	return 0;
 
 cleanup:
@@ -2114,7 +2075,6 @@ static int fuse_write_end(struct file *file, struct address_space *mapping,
 unlock:
 	unlock_page(page);
 	put_page(page);
-	trace_android_fs_datawrite_end(inode, pos, len);
 
 	return copied;
 }
@@ -2155,7 +2115,7 @@ static void fuse_vma_close(struct vm_area_struct *vma)
  * - sync(2)
  * - try_to_free_pages() with order > PAGE_ALLOC_COSTLY_ORDER
  */
-static int fuse_page_mkwrite(struct vm_fault *vmf)
+static vm_fault_t fuse_page_mkwrite(struct vm_fault *vmf)
 {
 	struct page *page = vmf->page;
 	struct inode *inode = file_inode(vmf->vma->vm_file);
@@ -2180,6 +2140,11 @@ static const struct vm_operations_struct fuse_file_vm_ops = {
 
 static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	struct fuse_file *ff = file->private_data;
+
+	if (ff->passthrough.filp)
+		return fuse_passthrough_mmap(file, vma);
+
 	if ((vma->vm_flags & VM_SHARED) && (vma->vm_flags & VM_MAYWRITE))
 		fuse_link_write_file(file);
 
@@ -2190,6 +2155,11 @@ static int fuse_file_mmap(struct file *file, struct vm_area_struct *vma)
 
 static int fuse_direct_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	struct fuse_file *ff = file->private_data;
+
+	if (ff->passthrough.filp)
+		return fuse_passthrough_mmap(file, vma);
+
 	/* Can't provide the coherency needed for MAP_SHARED */
 	if (vma->vm_flags & VM_MAYSHARE)
 		return -ENODEV;
@@ -2867,7 +2837,7 @@ static void fuse_register_polled_file(struct fuse_conn *fc,
 	spin_unlock(&fc->lock);
 }
 
-unsigned fuse_file_poll(struct file *file, poll_table *wait)
+__poll_t fuse_file_poll(struct file *file, poll_table *wait)
 {
 	struct fuse_file *ff = file->private_data;
 	struct fuse_conn *fc = ff->fc;
@@ -2880,7 +2850,7 @@ unsigned fuse_file_poll(struct file *file, poll_table *wait)
 		return DEFAULT_POLLMASK;
 
 	poll_wait(file, &ff->poll_wait, wait);
-	inarg.events = (__u32)poll_requested_events(wait);
+	inarg.events = mangle_poll(poll_requested_events(wait));
 
 	/*
 	 * Ask for notification iff there's someone waiting for it.
@@ -2902,12 +2872,12 @@ unsigned fuse_file_poll(struct file *file, poll_table *wait)
 	err = fuse_simple_request(fc, &args);
 
 	if (!err)
-		return outarg.revents;
+		return demangle_poll(outarg.revents);
 	if (err == -ENOSYS) {
 		fc->no_poll = 1;
 		return DEFAULT_POLLMASK;
 	}
-	return POLLERR;
+	return EPOLLERR;
 }
 EXPORT_SYMBOL_GPL(fuse_file_poll);
 
@@ -3130,6 +3100,8 @@ out:
 
 	if (lock_inode)
 		inode_unlock(inode);
+
+	fuse_flush_time_update(inode);
 
 	return err;
 }
