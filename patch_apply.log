@@ -1418,3 +1418,483 @@ patching file 'fs/xfs/xfs_trans_refcount.c'
 patching file 'fs/xfs/xfs_trans_rmap.c'
 patching file 'fs/xfs/xfs_xattr.c'
 [✓] Applied: fs_backport.patch
+[lineage-20 cfc142be5] Applied patch: fs_backport.patch
+ 1257 files changed, 117312 insertions(+), 85265 deletions(-)
+ create mode 100644 fs/OWNERS
+ create mode 100644 fs/afs/addr_list.c
+ create mode 100644 fs/afs/dir_edit.c
+ create mode 100644 fs/afs/dynroot.c
+ create mode 100644 fs/afs/rotate.c
+ create mode 100644 fs/afs/server_list.c
+ create mode 100644 fs/afs/xdr_fs.h
+ create mode 100644 fs/autofs/Kconfig
+ create mode 100644 fs/autofs/Makefile
+ create mode 100644 fs/autofs/autofs_i.h
+ create mode 100644 fs/autofs/dev-ioctl.c
+ create mode 100644 fs/autofs/expire.c
+ create mode 100644 fs/autofs/init.c
+ create mode 100644 fs/autofs/inode.c
+ create mode 100644 fs/autofs/root.c
+ create mode 100644 fs/autofs/symlink.c
+ create mode 100644 fs/autofs/waitq.c
+ create mode 100644 fs/btrfs/ref-verify.c
+ create mode 100644 fs/btrfs/ref-verify.h
+ create mode 100644 fs/btrfs/tests/extent-map-tests.c
+ create mode 100644 fs/ceph/quota.c
+ create mode 100644 fs/cifs/smbdirect.c
+ create mode 100644 fs/cifs/smbdirect.h
+ create mode 100644 fs/cifs/trace.c
+ create mode 100644 fs/cifs/trace.h
+ create mode 100644 fs/d_path.c
+ create mode 100644 fs/erofs/Kconfig
+ create mode 100644 fs/erofs/Makefile
+ create mode 100644 fs/erofs/compress.h
+ create mode 100644 fs/erofs/data.c
+ create mode 100644 fs/erofs/decompressor.c
+ create mode 100644 fs/erofs/dir.c
+ create mode 100644 fs/erofs/erofs_fs.h
+ create mode 100644 fs/erofs/inode.c
+ create mode 100644 fs/erofs/internal.h
+ create mode 100644 fs/erofs/namei.c
+ create mode 100644 fs/erofs/pcpubuf.c
+ create mode 100644 fs/erofs/super.c
+ create mode 100644 fs/erofs/tagptr.h
+ create mode 100644 fs/erofs/utils.c
+ create mode 100644 fs/erofs/xattr.c
+ create mode 100644 fs/erofs/xattr.h
+ create mode 100644 fs/erofs/zdata.c
+ create mode 100644 fs/erofs/zdata.h
+ create mode 100644 fs/erofs/zmap.c
+ create mode 100644 fs/erofs/zpvec.h
+ create mode 100644 fs/exfat/balloc.c
+ create mode 100644 fs/exfat/cache.c
+ create mode 100644 fs/exfat/dir.c
+ create mode 100644 fs/exfat/exfat_fs.h
+ create mode 100644 fs/exfat/exfat_raw.h
+ create mode 100644 fs/exfat/fatent.c
+ create mode 100644 fs/exfat/file.c
+ create mode 100644 fs/exfat/inode.c
+ create mode 100644 fs/exfat/misc.c
+ create mode 100644 fs/exfat/namei.c
+ create mode 100644 fs/exfat/nls.c
+ create mode 100644 fs/exfat/super.c
+ create mode 100644 fs/f2fs/OWNERS
+ create mode 100644 fs/fuse/OWNERS
+ create mode 100644 fs/fuse/passthrough.c
+ create mode 100644 fs/gfs2/aops.h
+ create mode 100644 fs/incfs/OWNERS
+ create mode 100644 fs/overlayfs/export.c
+ create mode 100644 fs/overlayfs/file.c
+ create mode 100644 fs/proc/util.c
+ create mode 100644 fs/unicode/utf8data.c_shipped
+ create mode 100644 fs/xfs/libxfs/xfs_ag.c
+ create mode 100644 fs/xfs/libxfs/xfs_ag.h
+ create mode 100644 fs/xfs/libxfs/xfs_attr.h
+ create mode 100644 fs/xfs/libxfs/xfs_errortag.h
+ create mode 100644 fs/xfs/libxfs/xfs_iext_tree.c
+ create mode 100644 fs/xfs/libxfs/xfs_types.c
+ create mode 100644 fs/xfs/scrub/agheader.c
+ create mode 100644 fs/xfs/scrub/agheader_repair.c
+ create mode 100644 fs/xfs/scrub/alloc.c
+ create mode 100644 fs/xfs/scrub/attr.c
+ create mode 100644 fs/xfs/scrub/bitmap.c
+ create mode 100644 fs/xfs/scrub/bitmap.h
+ create mode 100644 fs/xfs/scrub/bmap.c
+ create mode 100644 fs/xfs/scrub/btree.c
+ create mode 100644 fs/xfs/scrub/btree.h
+ create mode 100644 fs/xfs/scrub/common.c
+ create mode 100644 fs/xfs/scrub/common.h
+ create mode 100644 fs/xfs/scrub/dabtree.c
+ create mode 100644 fs/xfs/scrub/dabtree.h
+ create mode 100644 fs/xfs/scrub/dir.c
+ create mode 100644 fs/xfs/scrub/ialloc.c
+ create mode 100644 fs/xfs/scrub/inode.c
+ create mode 100644 fs/xfs/scrub/parent.c
+ create mode 100644 fs/xfs/scrub/quota.c
+ create mode 100644 fs/xfs/scrub/refcount.c
+ create mode 100644 fs/xfs/scrub/repair.c
+ create mode 100644 fs/xfs/scrub/repair.h
+ create mode 100644 fs/xfs/scrub/rmap.c
+ create mode 100644 fs/xfs/scrub/rtbitmap.c
+ create mode 100644 fs/xfs/scrub/scrub.c
+ create mode 100644 fs/xfs/scrub/scrub.h
+ create mode 100644 fs/xfs/scrub/symlink.c
+ create mode 100644 fs/xfs/scrub/trace.c
+ create mode 100644 fs/xfs/scrub/trace.h
+ create mode 100644 fs/xfs/scrub/xfs_scrub.h
+[*] Applying patch: kernel_backport.patch
+patching file 'kernel/Kconfig.preempt'
+patching file 'kernel/Makefile'
+patching file 'kernel/acct.c'
+patching file 'kernel/audit.c'
+patching file 'kernel/audit.h'
+patching file 'kernel/audit_fsnotify.c'
+patching file 'kernel/audit_tree.c'
+patching file 'kernel/audit_watch.c'
+patching file 'kernel/auditfilter.c'
+patching file 'kernel/auditsc.c'
+patching file 'kernel/bpf/Makefile'
+patching file 'kernel/bpf/arraymap.c'
+patching file 'kernel/bpf/btf.c'
+patching file 'kernel/bpf/cgroup.c'
+patching file 'kernel/bpf/core.c'
+patching file 'kernel/bpf/cpumap.c'
+patching file 'kernel/bpf/devmap.c'
+patching file 'kernel/bpf/disasm.c'
+patching file 'kernel/bpf/disasm.h'
+patching file 'kernel/bpf/hashtab.c'
+patching file 'kernel/bpf/helpers.c'
+patching file 'kernel/bpf/inode.c'
+patching file 'kernel/bpf/local_storage.c'
+patching file 'kernel/bpf/lpm_trie.c'
+patching file 'kernel/bpf/map_in_map.c'
+patching file 'kernel/bpf/map_in_map.h'
+patching file 'kernel/bpf/offload.c'
+patching file 'kernel/bpf/reuseport_array.c'
+patching file 'kernel/bpf/sockmap.c'
+patching file 'kernel/bpf/stackmap.c'
+patching file 'kernel/bpf/syscall.c'
+patching file 'kernel/bpf/tnum.c'
+patching file 'kernel/bpf/verifier.c'
+patching file 'kernel/bpf/xskmap.c'
+patching file 'kernel/capability.c'
+patching file 'kernel/cfi.c'
+patching file 'kernel/cgroup/Makefile'
+patching file 'kernel/cgroup/cgroup-internal.h'
+patching file 'kernel/cgroup/cgroup-v1.c'
+patching file 'kernel/cgroup/cgroup.c'
+patching file 'kernel/cgroup/cpuset.c'
+patching file 'kernel/cgroup/debug.c'
+patching file 'kernel/cgroup/freezer.c'
+patching file 'kernel/cgroup/legacy_freezer.c'
+patching file 'kernel/cgroup/rdma.c'
+patching file 'kernel/cgroup/rstat.c'
+patching file 'kernel/compat.c'
+patching file 'kernel/configs/android-base.config'
+patching file 'kernel/configs/android-fetch-configs.sh'
+patching file 'kernel/configs/android-recommended.config'
+patching file 'kernel/configs/kvm_guest.config'
+patching file 'kernel/configs/mi_user_root.config'
+patching file 'kernel/configs/nopm.config'
+patching file 'kernel/configs/userdebug.config'
+patching file 'kernel/configs/vulscan.config'
+patching file 'kernel/cpu.c'
+patching file 'kernel/cpu_pm.c'
+patching file 'kernel/crash_core.c'
+patching file 'kernel/debug/debug_core.c'
+patching file 'kernel/debug/kdb/kdb_bp.c'
+patching file 'kernel/debug/kdb/kdb_io.c'
+patching file 'kernel/debug/kdb/kdb_main.c'
+patching file 'kernel/debug/kdb/kdb_private.h'
+patching file 'kernel/dma/Kconfig'
+patching file 'kernel/dma/Makefile'
+patching file 'kernel/dma/coherent.c'
+patching file 'kernel/dma/contiguous.c'
+patching file 'kernel/dma/debug.c'
+patching file 'kernel/dma/direct.c'
+patching file 'kernel/dma/mapping.c'
+patching file 'kernel/dma/noncoherent.c'
+patching file 'kernel/dma/removed.c'
+patching file 'kernel/dma/swiotlb.c'
+patching file 'kernel/dma/virt.c'
+patching file 'kernel/dma.c'
+patching file 'kernel/events/callchain.c'
+patching file 'kernel/events/core.c'
+patching file 'kernel/events/hw_breakpoint.c'
+patching file 'kernel/events/internal.h'
+patching file 'kernel/events/ring_buffer.c'
+patching file 'kernel/events/uprobes.c'
+patching file 'kernel/exec_domain.c'
+patching file 'kernel/exit.c'
+patching file 'kernel/extable.c'
+patching file 'kernel/fail_function.c'
+patching file 'kernel/fork.c'
+patching file 'kernel/freezer.c'
+patching file 'kernel/futex.c'
+patching file 'kernel/gcov/Kconfig'
+patching file 'kernel/gcov/Makefile'
+patching file 'kernel/gcov/clang.c'
+patching file 'kernel/gcov/gcc_4_7.c'
+patching file 'kernel/gen_kheaders.sh'
+patching file 'kernel/hung_task.c'
+patching file 'kernel/iomem.c'
+patching file 'kernel/irq/Kconfig'
+patching file 'kernel/irq/Makefile'
+patching file 'kernel/irq/affinity.c'
+patching file 'kernel/irq/autoprobe.c'
+patching file 'kernel/irq/chip.c'
+patching file 'kernel/irq/cpuhotplug.c'
+patching file 'kernel/irq/debug.h'
+patching file 'kernel/irq/debugfs.c'
+patching file 'kernel/irq/devres.c'
+patching file 'kernel/irq/dummychip.c'
+patching file 'kernel/irq/generic-chip.c'
+patching file 'kernel/irq/handle.c'
+patching file 'kernel/irq/internals.h'
+patching file 'kernel/irq/ipi.c'
+patching file 'kernel/irq/irq_sim.c'
+patching file 'kernel/irq/irqdesc.c'
+patching file 'kernel/irq/irqdomain.c'
+patching file 'kernel/irq/manage.c'
+patching file 'kernel/irq/matrix.c'
+patching file 'kernel/irq/migration.c'
+patching file 'kernel/irq/msi.c'
+patching file 'kernel/irq/pm.c'
+patching file 'kernel/irq/proc.c'
+patching file 'kernel/irq/resend.c'
+patching file 'kernel/irq/spurious.c'
+patching file 'kernel/irq/timings.c'
+patching file 'kernel/irq_work.c'
+patching file 'kernel/jump_label.c'
+patching file 'kernel/kallsyms.c'
+patching file 'kernel/kcov.c'
+patching file 'kernel/kexec.c'
+patching file 'kernel/kexec_core.c'
+patching file 'kernel/kexec_file.c'
+patching file 'kernel/kheaders.c'
+patching file 'kernel/kprobes.c'
+patching file 'kernel/kthread.c'
+patching file 'kernel/livepatch/Makefile'
+patching file 'kernel/livepatch/core.c'
+patching file 'kernel/livepatch/core.h'
+patching file 'kernel/livepatch/patch.c'
+patching file 'kernel/livepatch/shadow.c'
+patching file 'kernel/livepatch/transition.c'
+patching file 'kernel/livepatch/transition.h'
+patching file 'kernel/locking/Makefile'
+patching file 'kernel/locking/lockdep.c'
+patching file 'kernel/locking/lockdep_internals.h'
+patching file 'kernel/locking/lockdep_internals_mtk.h'
+patching file 'kernel/locking/lockdep_proc.c'
+patching file 'kernel/locking/lockdep_test.c'
+patching file 'kernel/locking/locktorture.c'
+patching file 'kernel/locking/mcs_spinlock.h'
+patching file 'kernel/locking/mutex-debug.c'
+patching file 'kernel/locking/mutex-debug.h'
+patching file 'kernel/locking/mutex.c'
+patching file 'kernel/locking/mutex.h'
+patching file 'kernel/locking/qrwlock.c'
+patching file 'kernel/locking/qspinlock.c'
+patching file 'kernel/locking/qspinlock_paravirt.h'
+patching file 'kernel/locking/qspinlock_stat.h'
+patching file 'kernel/locking/rtmutex.c'
+patching file 'kernel/locking/rtmutex_common.h'
+patching file 'kernel/locking/rwsem-xadd.c'
+patching file 'kernel/locking/rwsem.c'
+patching file 'kernel/locking/rwsem.h'
+patching file 'kernel/locking/spinlock.c'
+patching file 'kernel/locking/spinlock_debug.c'
+patching file 'kernel/locking/test-ww_mutex.c'
+patching file 'kernel/memremap.c'
+patching file 'kernel/module-internal.h'
+patching file 'kernel/module.c'
+patching file 'kernel/module_signing.c'
+patching file 'kernel/padata.c'
+patching file 'kernel/panic.c'
+patching file 'kernel/params.c'
+patching file 'kernel/pid.c'
+patching file 'kernel/pid_namespace.c'
+patching file 'kernel/power/Kconfig'
+patching file 'kernel/power/Makefile'
+patching file 'kernel/power/energy_model.c'
+patching file 'kernel/power/hibernate.c'
+patching file 'kernel/power/main.c'
+patching file 'kernel/power/qos.c'
+patching file 'kernel/power/snapshot.c'
+patching file 'kernel/power/suspend.c'
+patching file 'kernel/power/swap.c'
+patching file 'kernel/power/user.c'
+patching file 'kernel/printk/internal.h'
+patching file 'kernel/printk/printk.c'
+patching file 'kernel/printk/printk_safe.c'
+patching file 'kernel/ptrace.c'
+patching file 'kernel/rcu/rcu.h'
+patching file 'kernel/rcu/rcu_segcblist.c'
+patching file 'kernel/rcu/rcu_segcblist.h'
+patching file 'kernel/rcu/rcuperf.c'
+patching file 'kernel/rcu/rcutorture.c'
+patching file 'kernel/rcu/srcutiny.c'
+patching file 'kernel/rcu/srcutree.c'
+patching file 'kernel/rcu/tiny.c'
+patching file 'kernel/rcu/tree.c'
+patching file 'kernel/rcu/tree.h'
+patching file 'kernel/rcu/tree_exp.h'
+patching file 'kernel/rcu/tree_plugin.h'
+patching file 'kernel/rcu/update.c'
+patching file 'kernel/reboot.c'
+patching file 'kernel/relay.c'
+patching file 'kernel/resource.c'
+patching file 'kernel/rseq.c'
+patching file 'kernel/sched/Makefile'
+patching file 'kernel/sched/OWNERS'
+patching file 'kernel/sched/autogroup.c'
+patching file 'kernel/sched/autogroup.h'
+patching file 'kernel/sched/clock.c'
+patching file 'kernel/sched/completion.c'
+patching file 'kernel/sched/core.c'
+patching file 'kernel/sched/cpuacct.c'
+patching file 'kernel/sched/cpuacct.h'
+patching file 'kernel/sched/cpudeadline.c'
+patching file 'kernel/sched/cpudeadline.h'
+patching file 'kernel/sched/cpufreq.c'
+patching file 'kernel/sched/cpufreq_schedutil.c'
+patching file 'kernel/sched/cpufreq_schedutil.h'
+patching file 'kernel/sched/cpufreq_schedutil_plus.c'
+patching file 'kernel/sched/cpupri.c'
+patching file 'kernel/sched/cpupri.h'
+patching file 'kernel/sched/cputime.c'
+patching file 'kernel/sched/deadline.c'
+patching file 'kernel/sched/debug.c'
+patching file 'kernel/sched/debug_aee.c'
+patching file 'kernel/sched/eas_plus.c'
+patching file 'kernel/sched/eas_plus.h'
+patching file 'kernel/sched/energy.c'
+patching file 'kernel/sched/energy_plus.c'
+patching file 'kernel/sched/energy_plus.h'
+patching file 'kernel/sched/extension/Kconfig'
+patching file 'kernel/sched/extension/Makefile'
+patching file 'kernel/sched/extension/debug.c'
+patching file 'kernel/sched/extension/debug_aee.c'
+patching file 'kernel/sched/extension/eas_plus.c'
+patching file 'kernel/sched/extension/eas_plus.h'
+patching file 'kernel/sched/extension/tuning.c'
+patching file 'kernel/sched/extension/tuning.h'
+patching file 'kernel/sched/fair.c'
+patching file 'kernel/sched/features.h'
+patching file 'kernel/sched/hmp.c'
+patching file 'kernel/sched/hmp.h'
+patching file 'kernel/sched/idle.c'
+patching file 'kernel/sched/idle_task.c'
+patching file 'kernel/sched/isolation.c'
+patching file 'kernel/sched/loadavg.c'
+patching file 'kernel/sched/membarrier.c'
+patching file 'kernel/sched/pelt.c'
+patching file 'kernel/sched/pelt.h'
+patching file 'kernel/sched/psi.c'
+patching file 'kernel/sched/rt.c'
+patching file 'kernel/sched/rt_ext.c'
+patching file 'kernel/sched/sched-pelt.h'
+patching file 'kernel/sched/sched.h'
+patching file 'kernel/sched/sched_plus.h'
+patching file 'kernel/sched/stats.c'
+patching file 'kernel/sched/stats.h'
+patching file 'kernel/sched/stop_task.c'
+patching file 'kernel/sched/stubs.c'
+patching file 'kernel/sched/swait.c'
+patching file 'kernel/sched/topology.c'
+patching file 'kernel/sched/tune.c'
+patching file 'kernel/sched/tune.h'
+patching file 'kernel/sched/tune_plus.c'
+patching file 'kernel/sched/wait.c'
+patching file 'kernel/sched/wait_bit.c'
+patching file 'kernel/sched/walt.c'
+patching file 'kernel/sched/walt.h'
+patching file 'kernel/scs.c'
+patching file 'kernel/seccomp.c'
+patching file 'kernel/signal.c'
+patching file 'kernel/smp.c'
+patching file 'kernel/smpboot.c'
+patching file 'kernel/softirq.c'
+patching file 'kernel/stop_machine.c'
+patching file 'kernel/sys.c'
+patching file 'kernel/sys_ni.c'
+patching file 'kernel/sysctl.c'
+patching file 'kernel/sysctl_binary.c'
+patching file 'kernel/taskstats.c'
+patching file 'kernel/test_kprobes.c'
+patching file 'kernel/time/Kconfig'
+patching file 'kernel/time/Makefile'
+patching file 'kernel/time/alarmtimer.c'
+patching file 'kernel/time/clockevents.c'
+patching file 'kernel/time/clocksource.c'
+patching file 'kernel/time/hrtimer.c'
+patching file 'kernel/time/itimer.c'
+patching file 'kernel/time/ntp.c'
+patching file 'kernel/time/ntp_internal.h'
+patching file 'kernel/time/posix-clock.c'
+patching file 'kernel/time/posix-cpu-timers.c'
+patching file 'kernel/time/posix-stubs.c'
+patching file 'kernel/time/posix-timers.c'
+patching file 'kernel/time/sched_clock.c'
+patching file 'kernel/time/tick-broadcast-hrtimer.c'
+patching file 'kernel/time/tick-broadcast.c'
+patching file 'kernel/time/tick-common.c'
+patching file 'kernel/time/tick-internal.h'
+patching file 'kernel/time/tick-oneshot.c'
+patching file 'kernel/time/tick-sched.c'
+patching file 'kernel/time/tick-sched.h'
+patching file 'kernel/time/time.c'
+patching file 'kernel/time/timekeeping.c'
+patching file 'kernel/time/timekeeping.h'
+patching file 'kernel/time/timekeeping_debug.c'
+patching file 'kernel/time/timekeeping_internal.h'
+patching file 'kernel/time/timer.c'
+patching file 'kernel/time/timer_list.c'
+patching file 'kernel/time/timer_list_aee.c'
+patching file 'kernel/time/vsyscall.c'
+patching file 'kernel/torture.c'
+patching file 'kernel/trace/Kconfig'
+patching file 'kernel/trace/Makefile'
+patching file 'kernel/trace/blktrace.c'
+patching file 'kernel/trace/bpf_trace.c'
+patching file 'kernel/trace/ftrace.c'
+patching file 'kernel/trace/gpu-traces.c'
+patching file 'kernel/trace/mtk_ftrace.h'
+patching file 'kernel/trace/mtk_trace.c'
+patching file 'kernel/trace/power-traces.c'
+patching file 'kernel/trace/preemptirq_delay_test.c'
+patching file 'kernel/trace/ring_buffer.c'
+patching file 'kernel/trace/ring_buffer_benchmark.c'
+patching file 'kernel/trace/trace.c'
+patching file 'kernel/trace/trace.h'
+patching file 'kernel/trace/trace_benchmark.c'
+patching file 'kernel/trace/trace_benchmark.h'
+patching file 'kernel/trace/trace_clock.c'
+patching file 'kernel/trace/trace_dynevent.c'
+patching file 'kernel/trace/trace_dynevent.h'
+patching file 'kernel/trace/trace_entries.h'
+patching file 'kernel/trace/trace_event_perf.c'
+patching file 'kernel/trace/trace_events.c'
+patching file 'kernel/trace/trace_events_filter.c'
+patching file 'kernel/trace/trace_events_filter_test.h'
+patching file 'kernel/trace/trace_events_hist.c'
+patching file 'kernel/trace/trace_events_trigger.c'
+patching file 'kernel/trace/trace_export.c'
+patching file 'kernel/trace/trace_functions.c'
+patching file 'kernel/trace/trace_functions_graph.c'
+patching file 'kernel/trace/trace_hwlat.c'
+patching file 'kernel/trace/trace_irqsoff.c'
+patching file 'kernel/trace/trace_kprobe.c'
+patching file 'kernel/trace/trace_kprobe_selftest.c'
+patching file 'kernel/trace/trace_kprobe_selftest.h'
+patching file 'kernel/trace/trace_mmstat.c'
+patching file 'kernel/trace/trace_mmstat.h'
+patching file 'kernel/trace/trace_output.c'
+patching file 'kernel/trace/trace_output.h'
+patching file 'kernel/trace/trace_preemptirq.c'
+patching file 'kernel/trace/trace_printk.c'
+patching file 'kernel/trace/trace_probe.c'
+patching file 'kernel/trace/trace_probe.h'
+patching file 'kernel/trace/trace_sched_wakeup.c'
+patching file 'kernel/trace/trace_selftest.c'
+patching file 'kernel/trace/trace_selftest_dynamic.c'
+patching file 'kernel/trace/trace_seq.c'
+patching file 'kernel/trace/trace_stack.c'
+patching file 'kernel/trace/trace_stat.h'
+patching file 'kernel/trace/trace_syscalls.c'
+patching file 'kernel/trace/trace_uprobe.c'
+patching file 'kernel/trace/tracing_map.c'
+patching file 'kernel/trace/tracing_map.h'
+patching file 'kernel/tracepoint.c'
+patching file 'kernel/ucount.c'
+patching file 'kernel/uid16.c'
+patching file 'kernel/uid16.h'
+patching file 'kernel/umh.c'
+patching file 'kernel/user.c'
+patching file 'kernel/user_namespace.c'
+patching file 'kernel/utsname.c'
+patching file 'kernel/watchdog.c'
+patching file 'kernel/watchdog_hld.c'
+patching file 'kernel/workqueue.c'
+patching file 'kernel/workqueue_internal.h'
+[✓] Applied: kernel_backport.patch
