@@ -3274,3 +3274,210 @@ patching file 'net/xfrm/xfrm_replay.c'
 patching file 'net/xfrm/xfrm_state.c'
 patching file 'net/xfrm/xfrm_user.c'
 [✓] Applied: net_backport.patch
+[lineage-20 5d02db0cf] Applied patch: net_backport.patch
+ 1208 files changed, 109783 insertions(+), 58183 deletions(-)
+ create mode 100644 net/OWNERS
+ create mode 100644 net/bpfilter/.gitignore
+ create mode 100644 net/bpfilter/Kconfig
+ create mode 100644 net/bpfilter/Makefile
+ create mode 100644 net/bpfilter/bpfilter_kern.c
+ create mode 100644 net/bpfilter/bpfilter_umh_blob.S
+ create mode 100644 net/bpfilter/main.c
+ create mode 100644 net/bpfilter/msgfmt.h
+ create mode 100644 net/bridge/br_arp_nd_proxy.c
+ create mode 100644 net/ceph/striper.c
+ create mode 100644 net/core/failover.c
+ create mode 100644 net/core/page_pool.c
+ create mode 100644 net/core/xdp.c
+ create mode 100644 net/dccp/trace.h
+ create mode 100644 net/dsa/master.c
+ create mode 100644 net/ipv4/bpfilter/Makefile
+ create mode 100644 net/ipv4/bpfilter/sockopt.c
+ create mode 100644 net/ipv4/ipmr_base.c
+ create mode 100644 net/ipv4/metrics.c
+ create mode 100644 net/ipv4/netfilter/nf_flow_table_ipv4.c
+ create mode 100644 net/ipv4/netfilter/nf_nat_snmp_basic.asn1
+ create mode 100644 net/ipv4/netfilter/nf_nat_snmp_basic_main.c
+ create mode 100644 net/ipv4/netfilter/nf_tproxy_ipv4.c
+ create mode 100644 net/ipv4/netlink.c
+ create mode 100644 net/ipv6/ila/ila_main.c
+ create mode 100644 net/ipv6/netfilter/ip6t_srh.c
+ create mode 100644 net/ipv6/netfilter/nf_flow_table_ipv6.c
+ create mode 100644 net/ipv6/netfilter/nf_tproxy_ipv6.c
+ create mode 100644 net/mac80211/aead_api.c
+ create mode 100644 net/mac80211/aead_api.h
+ create mode 100644 net/mac80211/he.c
+ create mode 100644 net/netfilter/ipvs/ip_vs_mh.c
+ create mode 100644 net/netfilter/nf_conncount.c
+ create mode 100644 net/netfilter/nf_conntrack_proto_icmp.c
+ create mode 100644 net/netfilter/nf_conntrack_proto_icmpv6.c
+ create mode 100644 net/netfilter/nf_flow_table_core.c
+ create mode 100644 net/netfilter/nf_flow_table_inet.c
+ create mode 100644 net/netfilter/nf_flow_table_ip.c
+ create mode 100644 net/netfilter/nf_tables_set_core.c
+ create mode 100644 net/netfilter/nfnetlink_osf.c
+ create mode 100644 net/netfilter/nft_chain_filter.c
+ create mode 100644 net/netfilter/nft_connlimit.c
+ create mode 100644 net/netfilter/nft_flow_offload.c
+ create mode 100644 net/netfilter/nft_osf.c
+ create mode 100644 net/netfilter/nft_socket.c
+ create mode 100644 net/netfilter/nft_tproxy.c
+ create mode 100644 net/netfilter/nft_tunnel.c
+ create mode 100644 net/netfilter/utils.c
+ create mode 100644 net/openvswitch/meter.c
+ create mode 100644 net/openvswitch/meter.h
+ create mode 100644 net/qrtr/tun.c
+ create mode 100644 net/sched/em_ipt.c
+ create mode 100644 net/sched/sch_cake.c
+ create mode 100644 net/sched/sch_cbs.c
+ create mode 100644 net/sched/sch_etf.c
+ create mode 100644 net/sched/sch_skbprio.c
+ create mode 100644 net/sctp/diag.c
+ create mode 100644 net/sctp/stream_interleave.c
+ create mode 100644 net/sctp/stream_sched.c
+ create mode 100644 net/sctp/stream_sched_prio.c
+ create mode 100644 net/sctp/stream_sched_rr.c
+ create mode 100644 net/smc/smc_ism.c
+ create mode 100644 net/smc/smc_ism.h
+ create mode 100644 net/tipc/diag.c
+ create mode 100644 net/tipc/group.c
+ create mode 100644 net/tipc/group.h
+ create mode 100644 net/tipc/topsrv.c
+ create mode 100644 net/tipc/topsrv.h
+ create mode 100644 net/tls/tls_device.c
+ create mode 100644 net/tls/tls_device_fallback.c
+ create mode 100644 net/vmw_vsock/diag.c
+ create mode 100644 net/wireless/certs/sforshee.hex
+ create mode 100644 net/wireless/certs/wens.hex
+ create mode 100644 net/xdp/Kconfig
+ create mode 100644 net/xdp/Makefile
+ create mode 100644 net/xdp/xdp_umem.c
+ create mode 100644 net/xdp/xdp_umem.h
+ create mode 100644 net/xdp/xdp_umem_props.h
+ create mode 100644 net/xdp/xsk.c
+ create mode 100644 net/xdp/xsk_queue.c
+ create mode 100644 net/xdp/xsk_queue.h
+ create mode 100644 net/xfrm/xfrm_interface_core.c
+[*] Applying patch: security_backport.patch
+patching file 'security/Kconfig'
+patching file 'security/Kconfig.hardening'
+patching file 'security/apparmor/.gitignore'
+patching file 'security/apparmor/Makefile'
+patching file 'security/apparmor/apparmorfs.c'
+patching file 'security/apparmor/audit.c'
+patching file 'security/apparmor/capability.c'
+patching file 'security/apparmor/context.c'
+patching file 'security/apparmor/domain.c'
+patching file 'security/apparmor/file.c'
+patching file 'security/apparmor/include/apparmor.h'
+patching file 'security/apparmor/include/audit.h'
+patching file 'security/apparmor/include/capability.h'
+patching file 'security/apparmor/include/context.h'
+patching file 'security/apparmor/include/cred.h'
+patching file 'security/apparmor/include/label.h'
+patching file 'security/apparmor/include/lib.h'
+patching file 'security/apparmor/include/match.h'
+patching file 'security/apparmor/include/net.h'
+patching file 'security/apparmor/include/path.h'
+patching file 'security/apparmor/include/perms.h'
+patching file 'security/apparmor/include/policy.h'
+patching file 'security/apparmor/include/policy_unpack.h'
+patching file 'security/apparmor/include/secid.h'
+patching file 'security/apparmor/include/sig_names.h'
+patching file 'security/apparmor/include/task.h'
+patching file 'security/apparmor/ipc.c'
+patching file 'security/apparmor/label.c'
+patching file 'security/apparmor/lib.c'
+patching file 'security/apparmor/lsm.c'
+patching file 'security/apparmor/match.c'
+patching file 'security/apparmor/mount.c'
+patching file 'security/apparmor/net.c'
+patching file 'security/apparmor/nulldfa.in'
+patching file 'security/apparmor/policy.c'
+patching file 'security/apparmor/policy_ns.c'
+patching file 'security/apparmor/policy_unpack.c'
+patching file 'security/apparmor/procattr.c'
+patching file 'security/apparmor/resource.c'
+patching file 'security/apparmor/secid.c'
+patching file 'security/apparmor/stacksplitdfa.in'
+patching file 'security/apparmor/task.c'
+patching file 'security/commoncap.c'
+patching file 'security/device_cgroup.c'
+patching file 'security/integrity/digsig.c'
+patching file 'security/integrity/digsig_asymmetric.c'
+patching file 'security/integrity/evm/Kconfig'
+patching file 'security/integrity/evm/evm.h'
+patching file 'security/integrity/evm/evm_crypto.c'
+patching file 'security/integrity/evm/evm_main.c'
+patching file 'security/integrity/evm/evm_secfs.c'
+patching file 'security/integrity/iint.c'
+patching file 'security/integrity/ima/Kconfig'
+patching file 'security/integrity/ima/ima.h'
+patching file 'security/integrity/ima/ima_api.c'
+patching file 'security/integrity/ima/ima_appraise.c'
+patching file 'security/integrity/ima/ima_crypto.c'
+patching file 'security/integrity/ima/ima_fs.c'
+patching file 'security/integrity/ima/ima_init.c'
+patching file 'security/integrity/ima/ima_kexec.c'
+patching file 'security/integrity/ima/ima_main.c'
+patching file 'security/integrity/ima/ima_policy.c'
+patching file 'security/integrity/ima/ima_queue.c'
+patching file 'security/integrity/ima/ima_template.c'
+patching file 'security/integrity/ima/ima_template_lib.c'
+patching file 'security/integrity/integrity.h'
+patching file 'security/integrity/integrity_audit.c'
+patching file 'security/keys/big_key.c'
+patching file 'security/keys/dh.c'
+patching file 'security/keys/gc.c'
+patching file 'security/keys/internal.h'
+patching file 'security/keys/key.c'
+patching file 'security/keys/keyring.c'
+patching file 'security/keys/permission.c'
+patching file 'security/keys/proc.c'
+patching file 'security/keys/process_keys.c'
+patching file 'security/keys/request_key.c'
+patching file 'security/keys/trusted.c'
+patching file 'security/loadpin/loadpin.c'
+patching file 'security/lsm_audit.c'
+patching file 'security/min_addr.c'
+patching file 'security/security.c'
+patching file 'security/selinux/Kconfig'
+patching file 'security/selinux/avc.c'
+patching file 'security/selinux/hooks.c'
+patching file 'security/selinux/include/avc.h'
+patching file 'security/selinux/include/classmap.h'
+patching file 'security/selinux/include/netlabel.h'
+patching file 'security/selinux/include/objsec.h'
+patching file 'security/selinux/include/xfrm.h'
+patching file 'security/selinux/netif.c'
+patching file 'security/selinux/netlabel.c'
+patching file 'security/selinux/netlink.c'
+patching file 'security/selinux/netnode.c'
+patching file 'security/selinux/netport.c'
+patching file 'security/selinux/nlmsgtab.c'
+patching file 'security/selinux/selinuxfs.c'
+patching file 'security/selinux/ss/avtab.c'
+patching file 'security/selinux/ss/conditional.c'
+patching file 'security/selinux/ss/ebitmap.c'
+patching file 'security/selinux/ss/hashtab.c'
+patching file 'security/selinux/ss/mls.c'
+patching file 'security/selinux/ss/policydb.c'
+patching file 'security/selinux/ss/services.c'
+patching file 'security/selinux/ss/sidtab.c'
+patching file 'security/selinux/ss/sidtab.h'
+patching file 'security/selinux/xfrm.c'
+patching file 'security/smack/smack.h'
+patching file 'security/smack/smack_access.c'
+patching file 'security/smack/smack_lsm.c'
+patching file 'security/smack/smackfs.c'
+patching file 'security/tomoyo/Makefile'
+patching file 'security/tomoyo/audit.c'
+patching file 'security/tomoyo/common.c'
+patching file 'security/tomoyo/common.h'
+patching file 'security/tomoyo/domain.c'
+patching file 'security/tomoyo/network.c'
+patching file 'security/tomoyo/securityfs_if.c'
+patching file 'security/tomoyo/tomoyo.c'
+patching file 'security/tomoyo/util.c'
+patching file 'security/yama/yama_lsm.c'
+[✓] Applied: security_backport.patch
