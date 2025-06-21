@@ -1898,3 +1898,164 @@ patching file 'kernel/watchdog_hld.c'
 patching file 'kernel/workqueue.c'
 patching file 'kernel/workqueue_internal.h'
 [✓] Applied: kernel_backport.patch
+[lineage-20 26a6c43e9] Applied patch: kernel_backport.patch
+ 375 files changed, 58569 insertions(+), 33185 deletions(-)
+ create mode 100644 kernel/bpf/btf.c
+ create mode 100644 kernel/bpf/cpumap.c
+ create mode 100644 kernel/bpf/disasm.c
+ create mode 100644 kernel/bpf/disasm.h
+ create mode 100644 kernel/bpf/local_storage.c
+ create mode 100644 kernel/bpf/offload.c
+ create mode 100644 kernel/bpf/reuseport_array.c
+ create mode 100644 kernel/bpf/xskmap.c
+ create mode 100644 kernel/cgroup/legacy_freezer.c
+ create mode 100644 kernel/cgroup/rstat.c
+ create mode 100644 kernel/configs/android-base.config
+ create mode 100644 kernel/configs/android-recommended.config
+ create mode 100644 kernel/configs/nopm.config
+ create mode 100644 kernel/configs/vulscan.config
+ create mode 100644 kernel/dma/Kconfig
+ create mode 100644 kernel/dma/Makefile
+ create mode 100644 kernel/dma/coherent.c
+ create mode 100644 kernel/dma/contiguous.c
+ create mode 100644 kernel/dma/debug.c
+ create mode 100644 kernel/dma/direct.c
+ create mode 100644 kernel/dma/mapping.c
+ create mode 100644 kernel/dma/noncoherent.c
+ create mode 100644 kernel/dma/removed.c
+ create mode 100644 kernel/dma/swiotlb.c
+ create mode 100644 kernel/dma/virt.c
+ create mode 100644 kernel/fail_function.c
+ create mode 100644 kernel/iomem.c
+ create mode 100644 kernel/irq/matrix.c
+ create mode 100644 kernel/livepatch/shadow.c
+ create mode 100644 kernel/locking/lockdep_internals_mtk.h
+ create mode 100644 kernel/power/energy_model.c
+ create mode 100644 kernel/rseq.c
+ create mode 100644 kernel/sched/OWNERS
+ create mode 100644 kernel/sched/extension/Kconfig
+ create mode 100644 kernel/sched/extension/Makefile
+ create mode 100644 kernel/sched/extension/debug.c
+ create mode 100644 kernel/sched/extension/debug_aee.c
+ create mode 100644 kernel/sched/extension/eas_plus.c
+ create mode 100644 kernel/sched/extension/eas_plus.h
+ create mode 100644 kernel/sched/extension/tuning.c
+ create mode 100644 kernel/sched/extension/tuning.h
+ create mode 100644 kernel/sched/isolation.c
+ create mode 100644 kernel/sched/pelt.c
+ create mode 100644 kernel/sched/pelt.h
+ create mode 100644 kernel/sched/stubs.c
+ create mode 100644 kernel/time/vsyscall.c
+ create mode 100644 kernel/trace/preemptirq_delay_test.c
+ create mode 100644 kernel/trace/trace_dynevent.c
+ create mode 100644 kernel/trace/trace_dynevent.h
+ create mode 100644 kernel/trace/trace_kprobe_selftest.c
+ create mode 100644 kernel/trace/trace_kprobe_selftest.h
+ create mode 100644 kernel/trace/trace_mmstat.c
+ create mode 100644 kernel/trace/trace_mmstat.h
+ create mode 100644 kernel/trace/trace_preemptirq.c
+ create mode 100644 kernel/uid16.h
+[*] Applying patch: mm_backport.patch
+patching file 'mm/Kconfig'
+patching file 'mm/Kconfig.debug'
+patching file 'mm/Makefile'
+patching file 'mm/OWNERS'
+patching file 'mm/backing-dev.c'
+patching file 'mm/bootmem.c'
+patching file 'mm/cleancache.c'
+patching file 'mm/cma.c'
+patching file 'mm/cma_debug.c'
+patching file 'mm/compaction.c'
+patching file 'mm/debug.c'
+patching file 'mm/dmapool.c'
+patching file 'mm/fadvise.c'
+patching file 'mm/failslab.c'
+patching file 'mm/filemap.c'
+patching file 'mm/frontswap.c'
+patching file 'mm/gup.c'
+patching file 'mm/gup_benchmark.c'
+patching file 'mm/hmm.c'
+patching file 'mm/huge_memory.c'
+patching file 'mm/hugetlb.c'
+patching file 'mm/hugetlb_cgroup.c'
+patching file 'mm/hwpoison-inject.c'
+patching file 'mm/init-mm.c'
+patching file 'mm/internal.h'
+patching file 'mm/interval_tree.c'
+patching file 'mm/kasan/common.c'
+patching file 'mm/kasan/init.c'
+patching file 'mm/kasan/quarantine.c'
+patching file 'mm/khugepaged.c'
+patching file 'mm/kmemleak.c'
+patching file 'mm/ksm.c'
+patching file 'mm/list_lru.c'
+patching file 'mm/maccess.c'
+patching file 'mm/madvise.c'
+patching file 'mm/memblock.c'
+patching file 'mm/memcontrol.c'
+patching file 'mm/memfd.c'
+patching file 'mm/memory-failure.c'
+patching file 'mm/memory.c'
+patching file 'mm/memory_hotplug.c'
+patching file 'mm/mempolicy.c'
+patching file 'mm/mempool.c'
+patching file 'mm/memtest.c'
+patching file 'mm/migrate.c'
+patching file 'mm/mlock.c'
+patching file 'mm/mm_event.c'
+patching file 'mm/mm_init.c'
+patching file 'mm/mmap.c'
+patching file 'mm/mmu_notifier.c'
+patching file 'mm/mmzone.c'
+patching file 'mm/mprotect.c'
+patching file 'mm/mremap.c'
+patching file 'mm/nobootmem.c'
+patching file 'mm/nommu.c'
+patching file 'mm/oom_kill.c'
+patching file 'mm/page-writeback.c'
+patching file 'mm/page_alloc.c'
+patching file 'mm/page_counter.c'
+patching file 'mm/page_ext.c'
+patching file 'mm/page_idle.c'
+patching file 'mm/page_io.c'
+patching file 'mm/page_isolation.c'
+patching file 'mm/page_owner.c'
+patching file 'mm/page_poison.c'
+patching file 'mm/page_vma_mapped.c'
+patching file 'mm/pagewalk.c'
+patching file 'mm/percpu-km.c'
+patching file 'mm/percpu-stats.c'
+patching file 'mm/percpu-vm.c'
+patching file 'mm/percpu.c'
+patching file 'mm/pgtable-generic.c'
+patching file 'mm/process_vm_access.c'
+patching file 'mm/readahead.c'
+patching file 'mm/rmap.c'
+patching file 'mm/shmem.c'
+patching file 'mm/slab.c'
+patching file 'mm/slab.h'
+patching file 'mm/slab_common.c'
+patching file 'mm/slob.c'
+patching file 'mm/slub.c'
+patching file 'mm/sparse-vmemmap.c'
+patching file 'mm/sparse.c'
+patching file 'mm/swap.c'
+patching file 'mm/swap_slots.c'
+patching file 'mm/swap_state.c'
+patching file 'mm/swapfile.c'
+patching file 'mm/truncate.c'
+patching file 'mm/usercopy.c'
+patching file 'mm/userfaultfd.c'
+patching file 'mm/util.c'
+patching file 'mm/vmacache.c'
+patching file 'mm/vmalloc.c'
+patching file 'mm/vmpressure.c'
+patching file 'mm/vmscan.c'
+patching file 'mm/vmstat.c'
+patching file 'mm/workingset.c'
+patching file 'mm/z3fold.c'
+patching file 'mm/zbud.c'
+patching file 'mm/zpool.c'
+patching file 'mm/zsmalloc.c'
+patching file 'mm/zswap.c'
+[✓] Applied: mm_backport.patch
